@@ -17,19 +17,19 @@ logging.basicConfig(
 
 scheduler = BackgroundScheduler()
 
-@scheduler.scheduled_job(CronTrigger(minute='*/15'))  # Run every 15 minutes
+@scheduler.scheduled_job(CronTrigger(hour='*/2'))  # Run every 2 hours
 def scrape_job():
-    logging.info("Starting scheduled realtime scraping job...")
+    logging.info("Starting scheduled scraping job every 2 hours...")
     try:
         subprocess.run(["python", "main.py"], check=True)
-        logging.info("Realtime scraping job completed successfully")
+        logging.info("Scraping job completed successfully")
     except subprocess.CalledProcessError as e:
         logging.error(f"Scraping job failed with error: {str(e)}")
     except Exception as e:
         logging.error(f"Unexpected error in scraping job: {str(e)}")
 
 def run_scheduler():
-    logging.info("⏰ Starting scheduler - will run every 15 minutes for realtime news...")
+    logging.info("⏰ Starting scheduler - will run every 2 hours...")
     try:
         scheduler.start()
         # Keep the main thread alive
