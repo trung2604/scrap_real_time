@@ -8,3 +8,4 @@ flask==3.0.2
 poetry-core>=1.0.0
 newspaper3k==0.2.8
 python-dateutil>=2.8.2
+lxml==5.1.0

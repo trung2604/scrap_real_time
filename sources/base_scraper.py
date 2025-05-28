@@ -9,7 +9,7 @@ from pathlib import Path
 
 # Add parent directory to path to allow imports
 sys.path.append(str(Path(__file__).parent.parent))
-from utils import fetch_url
+from utils import fetch_url  # utils.py is in the root directory
 
 class BaseScraper:
     def __init__(self, source_name, base_url, article_url_pattern):

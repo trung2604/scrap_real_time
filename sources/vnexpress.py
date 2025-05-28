@@ -1,4 +1,4 @@
-from news_scraper_backend.sources.base_scraper import BaseScraper
+from sources.base_scraper import BaseScraper
 from datetime import datetime, timedelta
 import logging
 from urllib.parse import urljoin
