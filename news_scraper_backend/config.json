@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Sky Sports",
+    "base_url": "https://www.skysports.com/",
+    "article_url_pattern": "^https://www\\.skysports\\.com/[a-z-]+/news/\\d+/\\d+/.+$",
+    "module": "skysports"
+  },
+  {
+    "name": "CNBC",
+    "base_url": "https://www.cnbc.com/",
+    "article_url_pattern": "^https://www\\.cnbc\\.com/\\d{4}/\\d{2}/\\d{2}/.+\\.html$",
+    "module": "cnbc"
+  },
+  {
+    "name": "VnExpress International",
+    "base_url": "https://e.vnexpress.net/",
+    "article_url_pattern": "^https://e\\.vnexpress\\.net/news/[a-z0-9-]+/[a-z0-9-]+-\\d+\\.html$",
+    "module": "vnexpress"
+  }
+]
