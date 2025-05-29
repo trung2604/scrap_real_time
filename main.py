@@ -47,7 +47,7 @@ def main():
             try:
                 logging.info(f"Starting scrape for {source['name']}")
                 module = importlib.import_module(f"sources.{source['module']}")
-                article_urls = module.scrape_all_articles(source["base_url"], source["article_url_pattern"])
+                article_urls = module.scrape_all_articles()
                 
                 articles_saved = 0
                 logging.info(f"Found {len(article_urls)} articles for {source['name']}")
