@@ -3,7 +3,7 @@ services:
     name: news-scraper
     env: python
     buildCommand: poetry install
-    startCommand: poetry run python scheduler.py
+    startCommand: poetry run python wsgi.py
     envVars:
       - key: MONGO_URI
         value: mongodb+srv://trung7cyv:Pwrl2KClurSIANRy@cluster0.wwa6we5.mongodb.net/?retryWrites=true&w=majority
