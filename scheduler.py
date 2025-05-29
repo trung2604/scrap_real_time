@@ -17,9 +17,9 @@ logging.basicConfig(
 
 scheduler = BackgroundScheduler()
 
-@scheduler.scheduled_job(CronTrigger(minute='*/15'))  # Run every 15 minutes
+@scheduler.scheduled_job(CronTrigger(minute='*/30'))  # Run every 30 minutes
 def scrape_job():
-    logging.info("Starting scheduled scraping job every 15 minutes...")
+    logging.info("Starting scheduled scraping job every 30 minutes...")
     try:
         subprocess.run(["python", "main.py"], check=True)
         logging.info("Scraping job completed successfully")
@@ -29,7 +29,7 @@ def scrape_job():
         logging.error(f"Unexpected error in scraping job: {str(e)}")
 
 def run_scheduler():
-    logging.info("⏰ Starting scheduler - sẽ chạy mỗi 15 phút...")
+    logging.info("⏰ Starting scheduler - sẽ chạy mỗi 30 phút...")
     try:
         scheduler.start()
         # Keep the main thread alive
