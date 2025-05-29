@@ -5,7 +5,9 @@ import logging
 from datetime import datetime
 from threading import Thread
 from wsgi import app
+import os
 
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -21,7 +23,9 @@ scheduler = BackgroundScheduler()
 def scrape_job():
     logging.info("Starting scheduled scraping job every 30 minutes...")
     try:
-        subprocess.run(["python", "main.py"], check=True)
+        # Use absolute path to ensure script is found
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "main.py")
+        subprocess.run(["python", script_path], check=True)
         logging.info("Scraping job completed successfully")
     except subprocess.CalledProcessError as e:
         logging.error(f"Scraping job failed with error: {str(e)}")
@@ -47,6 +51,30 @@ if __name__ == "__main__":
     scheduler_thread.daemon = True
     scheduler_thread.start()
     
-    # Run the Flask app
-    app.run(host='0.0.0.0', port=10000)
+    # In production (Render), use gunicorn
+    if os.environ.get('RENDER'):
+        import gunicorn.app.base
+
+        class StandaloneApplication(gunicorn.app.base.BaseApplication):
+            def __init__(self, app, options=None):
+                self.options = options or {}
+                self.application = app
+                super().__init__()
+
+            def load_config(self):
+                for key, value in self.options.items():
+                    self.cfg.set(key, value)
+
+            def load(self):
+                return self.application
+
+        options = {
+            'bind': '0.0.0.0:10000',
+            'workers': 1,
+            'timeout': 120
+        }
+        StandaloneApplication(app, options).run()
+    else:
+        # In development, use Flask's built-in server
+        app.run(host='0.0.0.0', port=10000)
 
