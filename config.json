@@ -16,5 +16,47 @@
     "base_url": "https://e.vnexpress.net/",
     "article_url_pattern": "^https://e\\.vnexpress\\.net/news/[a-z0-9-]+/[a-z0-9-]+-\\d+\\.html$",
     "module": "vnexpress"
+  },
+  {
+    "name": "ESPN",
+    "base_url": "https://www.espn.com/",
+    "article_url_pattern": "^https://www\\.espn\\.com/.+/story/_/id/.+$",
+    "module": "espn"
+  },
+  {
+    "name": "CBS Sports",
+    "base_url": "https://www.cbssports.com/",
+    "article_url_pattern": "^https://www\\.cbssports\\.com/.+/(news|recap|preview)/.+$",
+    "module": "cbssports"
+  },
+  {
+    "name": "Goal.com",
+    "base_url": "https://www.goal.com/",
+    "article_url_pattern": "^https://www\\.goal\\.com/.+/news/.+$",
+    "module": "goal"
+  },
+  {
+    "name": "Transfermarkt",
+    "base_url": "https://www.transfermarkt.com/",
+    "article_url_pattern": "^https://www\\.transfermarkt\\.com/.+/news/.+$",
+    "module": "transfermarkt"
+  },
+  {
+    "name": "Motorsport.com",
+    "base_url": "https://www.motorsport.com/",
+    "article_url_pattern": "^https://www\\.motorsport\\.com/.+/news/.+$",
+    "module": "motorsport"
+  },
+  {
+    "name": "ATP Tour",
+    "base_url": "https://www.atptour.com/",
+    "article_url_pattern": "^https://www\\.atptour\\.com/en/news/.+$",
+    "module": "atptour"
+  },
+  {
+    "name": "NBA.com",
+    "base_url": "https://www.nba.com/",
+    "article_url_pattern": "^https://www\\.nba\\.com/news/.+$",
+    "module": "nba"
   }
 ]

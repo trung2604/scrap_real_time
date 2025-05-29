@@ -2,6 +2,7 @@ import json
 import importlib
 import logging
 import signal
+import sys
 from database import save_article, get_last_scrape_time, update_scrape_time, get_scraping_stats, check_existing_articles
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -40,6 +41,8 @@ def main():
         logging.info(f"Current stats: {stats_before}")
 
         total_articles_saved = 0
+        # Bỏ lọc chỉ ESPN, scrap tất cả domain
+        # sources = [s for s in sources if s["module"] == "espn"]
         for source in sources:
             if should_exit:
                 logging.info("Graceful shutdown initiated, exiting...")
@@ -52,29 +55,23 @@ def main():
             try:
                 logging.info(f"Starting scrape for {source['name']}")
                 module = importlib.import_module(f"sources.{source['module']}")
-                
                 # Get list of articles
                 articles = module.scrape_all_articles()
                 if not isinstance(articles, list):
                     logging.error(f"Expected list of articles from {source['name']}, got {type(articles)}")
                     continue
-                
                 articles_saved = 0
                 logging.info(f"Found {len(articles)} articles for {source['name']}")
                 if articles:
                     logging.info(f"First article sample: {json.dumps(articles[0], default=str)}")
-                
                 for article in articles:
                     if should_exit:
                         break
-
                     if not isinstance(article, dict):
                         logging.error(f"Invalid article type: {type(article)}")
                         continue
-
                     # Log article data before saving
                     logging.info(f"Article data before saving: {json.dumps(article, default=str)}")
-
                     try:
                         logging.info(f"Attempting to save article: {article.get('url', 'unknown URL')}")
                         if save_article(article):
@@ -89,10 +86,8 @@ def main():
                         logging.error(f"Error saving article {article.get('url', 'unknown URL')}: {str(e)}")
                         logging.error(f"Article data that caused error: {json.dumps(article, default=str)}")
                         continue
-
                 update_scrape_time(source["name"])
                 logging.info(f"Completed scraping {source['name']}. Saved {articles_saved} new articles.")
-                        
             except Exception as e:
                 logging.error(f"Error processing source {source['name']}: {str(e)}")
                 continue
@@ -111,8 +106,8 @@ if __name__ == "__main__":
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler('scraper.log'),
-            logging.StreamHandler()
+            logging.FileHandler('scraper.log', encoding='utf-8'),
+            logging.StreamHandler(sys.stdout)
         ]
     )
     main()

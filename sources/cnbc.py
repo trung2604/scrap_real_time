@@ -12,9 +12,14 @@ class CNBCScraper(BaseScraper):
         # Update article pattern to be less restrictive
         article_url_pattern = r"https://www\.cnbc\.com/(?:\d{4}/\d{2}/\d{2}/|select/|2024/|2023/|2025/|markets/|business/|technology/|politics/|economy/|investing/|personal-finance/|health-and-science/|wealth/|sports/|life/|small-business/|fintech/|financial-advisors/|options-action/|etf-street/|earnings/|trader-talk/|cybersecurity/|ai-artificial-intelligence/|enterprise/|internet/|media/|mobile/|social-media/|cnbc-disruptors/|tech-guide/|white-house/|policy/|defense/|congress/|equity-opportunity/|europe-politics/|china-politics/|asia-politics/|world-politics/).+"
         self.news_sections = [
-            '/latest-news/', '/top-news/', '/markets/', '/economy/', '/business/',
-            '/technology/', '/politics/', '/health-and-science/', '/personal-finance/',
-            '/investing/', '/select/'
+            '/sports/',
+            '/sports/football/',
+            '/sports/basketball/',
+            '/sports/tennis/',
+            '/sports/golf/',
+            '/sports/baseball/',
+            '/sports/hockey/',
+            # Thêm các chuyên mục con thể thao khác nếu có
         ]
         # Reduce exclude keywords to only filter out non-article content
         self.exclude_keywords = ["video", "slideshow", "watch", "live", "tv", "subscribe"]
@@ -23,7 +28,7 @@ class CNBCScraper(BaseScraper):
             base_url="https://www.cnbc.com",
             article_url_pattern=article_url_pattern
         )
-        self.max_links_to_crawl = 1000  # Increase max links to crawl
+        self.max_links_to_crawl = 3000
 
     def _extract_links(self, soup, base_url):
         links = []
@@ -47,43 +52,57 @@ class CNBCScraper(BaseScraper):
         logging.info(f"[CNBC] Found {len(links)} valid links from {base_url}")
         return links
 
+    def _extract_links_with_pagination(self, section_url):
+        links = []
+        page = 1
+        while len(links) < self.max_links_to_crawl:
+            # CNBC dùng dạng phân trang ?page={page}
+            url = section_url + f'?page={page}' if page > 1 else section_url
+            soup = self._get_soup(url)
+            if not soup:
+                break
+            new_links = []
+            for a in soup.find_all('a', href=True):
+                href = a['href']
+                if href.startswith('/'):
+                    href = urljoin(self.base_url, href)
+                elif not href.startswith('http'):
+                    href = urljoin(section_url, href)
+                if re.match(self.article_url_pattern, href):
+                    if any(x in href.lower() for x in self.exclude_keywords):
+                        continue
+                    if href not in links and href not in new_links:
+                        new_links.append(href)
+            if not new_links:
+                break
+            links.extend(new_links)
+            if len(links) >= self.max_links_to_crawl:
+                break
+            page += 1
+        return links[:self.max_links_to_crawl]
+
     def scrape_all_articles(self):
         articles = []
-        now = datetime.utcnow().replace(tzinfo=None)  # Make now timezone-naive
-        cutoff_time = now - timedelta(hours=48)  # Scrape articles from last 48 hours
-        logging.info(f"[CNBC] Starting to scrape articles from {cutoff_time} to {now}")
-        
+        logging.info(f"[CNBC] Starting to scrape all articles (no date filter)")
         try:
-            # First try homepage
-            homepage_url = self.base_url
-            logging.info(f"[CNBC] Scraping homepage: {homepage_url}")
-            soup = self._get_soup(homepage_url)
-            if soup:
-                links = self._extract_links(soup, homepage_url)
-                logging.info(f"[CNBC] Found {len(links)} links on homepage")
-                
+            for section in self.news_sections:
+                section_url = urljoin(self.base_url, section)
+                logging.info(f"[CNBC] Scraping section: {section_url}")
+                links = self._extract_links_with_pagination(section_url)
+                logging.info(f"[CNBC] Found {len(links)} links in section {section}")
                 for link in links:
+                    if any(article['url'] == link for article in articles):
+                        continue
                     try:
                         article_soup = self._get_soup(link)
                         if not article_soup:
                             continue
-                            
                         date = self._extract_date(article_soup)
                         if not date:
                             logging.warning(f"[CNBC] Could not extract date for {link}")
                             continue
-                            
-                        # Make date timezone-naive for comparison
-                        date = date.replace(tzinfo=None)
-                        logging.info(f"[CNBC] Article date: {date} for {link}")
-                        
-                        if date < cutoff_time:
-                            logging.info(f"[CNBC] Article too old: {date} for {link}")
-                            continue
-                            
                         title = self._extract_title(article_soup)
                         content = self._extract_content(article_soup)
-                        
                         if title and content:
                             articles.append({
                                 'title': title,
@@ -93,70 +112,11 @@ class CNBCScraper(BaseScraper):
                                 'source': self.source_name
                             })
                             logging.info(f"[CNBC] Successfully scraped article: {title}")
-                            
                     except Exception as e:
                         logging.error(f"[CNBC] Error scraping article {link}: {e}")
                         continue
-            
-            # Then try news sections
-            for section in self.news_sections:
-                section_url = urljoin(self.base_url, section)
-                logging.info(f"[CNBC] Scraping section: {section_url}")
-                
-                try:
-                    soup = self._get_soup(section_url)
-                    if not soup:
-                        continue
-                        
-                    links = self._extract_links(soup, section_url)
-                    logging.info(f"[CNBC] Found {len(links)} links in section {section}")
-                    
-                    for link in links:
-                        if any(article['url'] == link for article in articles):
-                            continue
-                            
-                        try:
-                            article_soup = self._get_soup(link)
-                            if not article_soup:
-                                continue
-                                
-                            date = self._extract_date(article_soup)
-                            if not date:
-                                logging.warning(f"[CNBC] Could not extract date for {link}")
-                                continue
-                                
-                            # Make date timezone-naive for comparison
-                            date = date.replace(tzinfo=None)
-                            logging.info(f"[CNBC] Article date: {date} for {link}")
-                            
-                            if date < cutoff_time:
-                                logging.info(f"[CNBC] Article too old: {date} for {link}")
-                                continue
-                                
-                            title = self._extract_title(article_soup)
-                            content = self._extract_content(article_soup)
-                            
-                            if title and content:
-                                articles.append({
-                                    'title': title,
-                                    'content': content,
-                                    'url': link,
-                                    'published_at': date,
-                                    'source': self.source_name
-                                })
-                                logging.info(f"[CNBC] Successfully scraped article: {title}")
-                                
-                        except Exception as e:
-                            logging.error(f"[CNBC] Error scraping article {link}: {e}")
-                            continue
-                            
-                except Exception as e:
-                    logging.error(f"[CNBC] Error scraping section {section_url}: {e}")
-                    continue
-                    
         except Exception as e:
             logging.error(f"[CNBC] Error in scrape_all_articles: {e}")
-            
         logging.info(f"[CNBC] Found {len(articles)} articles in total")
         return articles
 

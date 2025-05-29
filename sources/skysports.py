@@ -11,11 +11,20 @@ class SkySportsScraper(BaseScraper):
     def __init__(self):
         article_url_pattern = r"https://www\.skysports\.com/(?:football|f1|cricket|tennis|boxing|golf|rugby-union|rugby-league|nfl|racing|darts|netball|mma|news)/news/\d+/.+"
         self.news_sections = [
-            '/news/latest/', '/news/today/', '/news/breaking/', '/news/headlines/',
-            '/football/news/', '/f1/news/', '/cricket/news/', '/tennis/news/',
-            '/boxing/news/', '/golf/news/', '/rugby-union/news/', '/rugby-league/news/',
-            '/nfl/news/', '/racing/news/', '/darts/news/', '/netnetball/news/', '/mma/news/',
-            '/news/'
+            '/football/news/',
+            '/f1/news/',
+            '/cricket/news/',
+            '/tennis/news/',
+            '/boxing/news/',
+            '/golf/news/',
+            '/rugby-union/news/',
+            '/rugby-league/news/',
+            '/nfl/news/',
+            '/racing/news/',
+            '/darts/news/',
+            '/netball/news/',
+            '/mma/news/',
+            # Thêm các bộ môn thể thao khác nếu có
         ]
         self.exclude_keywords = ["video", "podcast", "live-blog", "watch", "tv", "live", "highlights"]
         super().__init__(
@@ -23,141 +32,77 @@ class SkySportsScraper(BaseScraper):
             base_url="https://www.skysports.com",
             article_url_pattern=article_url_pattern
         )
-        self.max_links_to_crawl = 1000
+        self.max_links_to_crawl = 3000
+
+    def _extract_links_with_pagination(self, section_url):
+        links = []
+        page = 1
+        while len(links) < self.max_links_to_crawl:
+            # Sky Sports dùng dạng phân trang /page/{page}
+            url = section_url.rstrip('/') + f'/page/{page}' if page > 1 else section_url
+            soup = self._get_soup(url)
+            if not soup:
+                break
+            new_links = []
+            for a in soup.find_all('a', href=True):
+                href = a['href']
+                if href.startswith('/'):
+                    href = urljoin(self.base_url, href)
+                elif not href.startswith('http'):
+                    href = urljoin(section_url, href)
+                if re.match(self.article_url_pattern, href):
+                    if any(x in href.lower() for x in self.exclude_keywords):
+                        continue
+                    if href not in links and href not in new_links:
+                        new_links.append(href)
+            if not new_links:
+                break
+            links.extend(new_links)
+            if len(links) >= self.max_links_to_crawl:
+                break
+            page += 1
+        return links[:self.max_links_to_crawl]
 
     def scrape_all_articles(self):
         articles = []
-        now = datetime.utcnow()
-        cutoff_time = now - timedelta(hours=48)  # Scrape articles from last 48 hours
-        logging.info(f"[SkySports] Starting to scrape articles from {cutoff_time} to {now}")
+        logging.info(f"[SkySports] Starting to scrape all articles (no date filter)")
 
         try:
-            # Scrape homepage
-            homepage_url = self.base_url
-            logging.info(f"[SkySports] Scraping homepage: {homepage_url}")
-            soup = self._get_soup(homepage_url)
-            if soup:
-                links = self._extract_links(soup, homepage_url)
-                logging.info(f"[SkySports] Found {len(links)} links on homepage")
-
+            for section in self.news_sections:
+                section_url = urljoin(self.base_url, section)
+                logging.info(f"[SkySports] Scraping section: {section_url}")
+                links = self._extract_links_with_pagination(section_url)
+                logging.info(f"[SkySports] Found {len(links)} links in section {section}")
                 for link in links:
+                    if any(article['url'] == link for article in articles):
+                        continue
                     try:
                         article_soup = self._get_soup(link)
                         if not article_soup:
                             continue
-
                         date = self._extract_date(article_soup, link)
                         if not date:
                             logging.warning(f"[SkySports] Could not extract date for {link}")
                             continue
-
-                        # Loại bỏ múi giờ để làm cho date thành offset-naive
-                        date = date.replace(tzinfo=None)
-                        logging.info(f"[SkySports] Article date: {date} for {link}")
-
-                        if date < cutoff_time:
-                            logging.info(f"[SkySports] Article too old: {date} for {link}")
-                            continue
-
                         title = self._extract_title(article_soup)
                         content = self._extract_content(article_soup)
-
                         if title and content:
                             articles.append({
                                 'title': title,
                                 'content': content,
                                 'url': link,
-                                'published_at': date,
+                                'published_at': date.isoformat() + 'Z' if date else None,
                                 'source': self.source_name
                             })
                             logging.info(f"[SkySports] Successfully scraped article: {title}")
-
                     except Exception as e:
                         logging.error(f"[SkySports] Error scraping article {link}: {e}")
                         continue
-
-            # Scrape news sections
-            for section in self.news_sections:
-                section_url = urljoin(self.base_url, section)
-                logging.info(f"[SkySports] Scraping section: {section_url}")
-
-                try:
-                    soup = self._get_soup(section_url)
-                    if not soup:
-                        continue
-
-                    links = self._extract_links(soup, section_url)
-                    logging.info(f"[SkySports] Found {len(links)} links in section {section}")
-
-                    for link in links:
-                        if any(article['url'] == link for article in articles):
-                            continue
-
-                        try:
-                            article_soup = self._get_soup(link)
-                            if not article_soup:
-                                continue
-
-                            date = self._extract_date(article_soup, link)
-                            if not date:
-                                logging.warning(f"[SkySports] Could not extract date for {link}")
-                                continue
-
-                            # Loại bỏ múi giờ để làm cho date thành offset-naive
-                            date = date.replace(tzinfo=None)
-                            logging.info(f"[SkySports] Article date: {date} for {link}")
-
-                            if date < cutoff_time:
-                                logging.info(f"[SkySports] Article too old: {date} for {link}")
-                                continue
-
-                            title = self._extract_title(article_soup)
-                            content = self._extract_content(article_soup)
-
-                            if title and content:
-                                articles.append({
-                                    'title': title,
-                                    'content': content,
-                                    'url': link,
-                                    'published_at': date,
-                                    'source': self.source_name
-                                })
-                                logging.info(f"[SkySports] Successfully scraped article: {title}")
-
-                        except Exception as e:
-                            logging.error(f"[SkySports] Error scraping article {link}: {e}")
-                            continue
-
-                except Exception as e:
-                    logging.error(f"[SkySports] Error scraping section {section_url}: {e}")
-                    continue
-
         except Exception as e:
             logging.error(f"[SkySports] Error in scrape_all_articles: {e}")
 
         logging.info(f"[SkySports] Found {len(articles)} articles in total")
         return articles
-
-    def _extract_links(self, soup, base_url):
-        links = []
-        for a in soup.find_all('a', href=True):
-            href = a['href']
-            if href.startswith('/'):
-                href = urljoin(self.base_url, href)
-            elif not href.startswith('http'):
-                href = urljoin(base_url, href)
-
-            if re.match(self.article_url_pattern, href):
-                if any(x in href.lower() for x in self.exclude_keywords):
-                    logging.debug(f"[SkySports] Excluding URL due to keywords: {href}")
-                    continue
-                if href not in links:
-                    links.append(href)
-                    if len(links) >= self.max_links_to_crawl:
-                        break
-
-        logging.info(f"[SkySports] Found {len(links)} valid links from {base_url}")
-        return links
 
     def _extract_date(self, soup, url):
         """Extract date from article content using multiple methods"""

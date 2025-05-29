@@ -50,7 +50,7 @@ def fetch_url(url, max_retries=3, retry_delay=1):
     for attempt in range(max_retries):
         try:
             logging.info(f"Fetching URL: {url} (attempt {attempt + 1}/{max_retries})")
-            response = requests.get(url, headers=headers, timeout=10)
+            response = requests.get(url, headers=headers, timeout=10, verify=False)
             
             # Log response details
             logging.info(f"Response status: {response.status_code}")

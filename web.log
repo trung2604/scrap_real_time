@@ -1,0 +1,57 @@
+2025-05-29 22:06:23,168 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-05-29 22:06:23,168 - INFO - Starting scraping job at 2025-05-29 22:06:23.168955
+2025-05-29 22:16:27,197 - INFO - Scraping job completed successfully. Duration: 0:10:04.021508
+2025-05-29 22:16:27,260 - INFO - Added job "Scrape news articles every 12 hours" to job store "default"
+2025-05-29 22:16:27,261 - INFO - Scheduler started
+2025-05-29 22:16:27,268 - INFO - Scheduler started
+2025-05-29 22:16:27,325 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:10000
+ * Running on http://192.168.1.171:10000
+2025-05-29 22:16:27,325 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-29 22:35:26,291 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-05-29 22:35:26,291 - INFO - Starting scraping job at 2025-05-29 22:35:26.291125
+2025-05-29 22:45:18,523 - INFO - Scraping job completed successfully. Duration: 0:09:52.232247
+2025-05-29 22:45:18,528 - INFO - Added job "Scrape news articles every 12 hours" to job store "default"
+2025-05-29 22:45:18,528 - INFO - Scheduler started
+2025-05-29 22:45:18,529 - INFO - Scheduler started
+2025-05-29 22:45:18,548 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:10000
+ * Running on http://192.168.1.171:10000
+2025-05-29 22:45:18,548 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-29 22:48:08,286 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-05-29 22:48:08,286 - INFO - Starting scraping job at 2025-05-29 22:48:08.286215
+2025-05-29 22:57:56,824 - INFO - Scraping job completed successfully. Duration: 0:09:48.523998
+2025-05-29 22:57:56,907 - INFO - Added job "Scrape news articles every 12 hours" to job store "default"
+2025-05-29 22:57:56,908 - INFO - Scheduler started
+2025-05-29 22:57:56,920 - INFO - Scheduler started
+2025-05-29 22:57:57,026 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:10000
+ * Running on http://192.168.1.171:10000
+2025-05-29 22:57:57,026 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-29 22:59:42,492 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-05-29 22:59:42,492 - INFO - Starting scraping job at 2025-05-29 22:59:42.492576
+2025-05-29 23:14:23,957 - INFO - Scraping job completed successfully. Duration: 0:14:41.461660
+2025-05-29 23:14:23,975 - INFO - Added job "Scrape news articles every 12 hours" to job store "default"
+2025-05-29 23:14:23,975 - INFO - Scheduler started
+2025-05-29 23:14:23,978 - INFO - Scheduler started
+2025-05-29 23:14:24,017 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:10000
+ * Running on http://192.168.1.171:10000
+2025-05-29 23:14:24,018 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-29 23:18:15,203 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-05-29 23:18:15,203 - INFO - Starting scraping job at 2025-05-29 23:18:15.203700
+2025-05-29 23:19:12,501 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-05-29 23:19:12,502 - INFO - Starting scraping job at 2025-05-29 23:19:12.502928
+2025-05-29 23:47:05,775 - INFO - Scraping job completed successfully. Duration: 0:27:53.262834
+2025-05-29 23:47:05,834 - INFO - Added job "Scrape news articles every 12 hours" to job store "default"
+2025-05-29 23:47:05,834 - INFO - Scheduler started
+2025-05-29 23:47:05,842 - INFO - Scheduler started
+2025-05-29 23:47:05,984 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:10000
+ * Running on http://192.168.1.171:10000
+2025-05-29 23:47:05,985 - INFO - [33mPress CTRL+C to quit[0m

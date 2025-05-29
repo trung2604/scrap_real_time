@@ -16,7 +16,7 @@ class BaseScraper:
         self.source_name = source_name
         self.base_url = base_url
         self.article_url_pattern = article_url_pattern
-        self.max_links_to_crawl = 100
+        self.max_links_to_crawl = 1000
 
     def _get_soup(self, url):
         """Get BeautifulSoup object for URL"""
