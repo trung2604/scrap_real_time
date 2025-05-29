@@ -1,0 +1,34 @@
+2025-05-29 16:44:47,137 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-05-29 16:44:47,155 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:10000
+ * Running on http://192.168.1.168:10000
+2025-05-29 16:44:47,157 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-29 16:44:47,162 - INFO - Added job "scrape_job" to job store "default"
+2025-05-29 16:44:47,162 - INFO - Scheduler started
+2025-05-29 16:46:00,387 - INFO - Starting scraping job at 2025-05-29 16:46:00.387359
+2025-05-29 17:10:15,100 - INFO - Scraping job completed successfully. Duration: 0:24:14.703961
+2025-05-29 17:10:15,191 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:10000
+ * Running on http://192.168.1.168:10000
+2025-05-29 17:10:15,191 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-29 17:14:48,419 - INFO - Starting scraping job at 2025-05-29 17:14:48.419915
+2025-05-29 17:17:41,130 - INFO - Starting scraping job at 2025-05-29 17:17:41.130232
+2025-05-29 17:17:44,848 - INFO - Scraping job completed successfully. Duration: 0:00:03.718699
+2025-05-29 17:17:44,862 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:10000
+ * Running on http://192.168.1.168:10000
+2025-05-29 17:17:44,862 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-29 17:18:49,379 - INFO - Starting scraping job at 2025-05-29 17:18:49.379922
+2025-05-29 17:19:57,127 - INFO - Starting scraping job at 2025-05-29 17:19:57.127664
+2025-05-29 17:20:08,281 - INFO - Starting scraping job at 2025-05-29 17:20:08.281526
+2025-05-29 17:21:06,689 - INFO - Starting scraping job at 2025-05-29 17:21:06.689646
+2025-05-29 17:22:52,366 - INFO - Starting scraping job at 2025-05-29 17:22:52.366383
+2025-05-29 17:40:16,417 - INFO - Scraping job completed successfully. Duration: 0:17:24.037911
+2025-05-29 17:40:16,564 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:10000
+ * Running on http://192.168.1.168:10000
+2025-05-29 17:40:16,564 - INFO - [33mPress CTRL+C to quit[0m

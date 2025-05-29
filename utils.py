@@ -49,16 +49,46 @@ def fetch_url(url, max_retries=3, retry_delay=1):
 
     for attempt in range(max_retries):
         try:
+            logging.info(f"Fetching URL: {url} (attempt {attempt + 1}/{max_retries})")
             response = requests.get(url, headers=headers, timeout=10)
+            
+            # Log response details
+            logging.info(f"Response status: {response.status_code}")
+            logging.info(f"Response headers: {dict(response.headers)}")
+            
+            if response.status_code == 403:
+                logging.error(f"Access forbidden (403) for URL: {url}")
+                logging.error(f"Response content: {response.text[:500]}...")  # Log first 500 chars
+                return None
+                
             response.raise_for_status()
             
             # Check if content is JavaScript-rendered
-            if 'text/javascript' in response.headers.get('Content-Type', ''):
+            content_type = response.headers.get('Content-Type', '')
+            logging.info(f"Content-Type: {content_type}")
+            
+            if 'text/javascript' in content_type:
                 logging.warning(f"URL {url} returns JavaScript content, may need Selenium")
                 return None
                 
+            # Log content length
+            content_length = len(response.text)
+            logging.info(f"Content length: {content_length} characters")
+            
+            if content_length < 100:  # Suspiciously small content
+                logging.warning(f"Suspiciously small content ({content_length} chars) for URL: {url}")
+                logging.warning(f"Content preview: {response.text[:200]}...")
+                
             soup = BeautifulSoup(response.text, 'lxml')
+            
+            # Check if we got a valid HTML document
+            if not soup.find('html'):
+                logging.warning(f"No HTML document found in response for URL: {url}")
+                logging.warning(f"Content preview: {response.text[:200]}...")
+                return None
+                
             return soup
+            
         except requests.RequestException as e:
             logging.error(f"Error fetching {url} (attempt {attempt + 1}/{max_retries}): {str(e)}")
             if attempt < max_retries - 1:

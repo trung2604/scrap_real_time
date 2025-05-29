@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import os
 import logging
 from datetime import datetime
+import json
 
 load_dotenv()
 
@@ -15,13 +16,15 @@ MONGO_TIMEOUT = 5000  # 5 seconds timeout
 def get_db():
     client = None
     try:
+        logging.info(f"Connecting to MongoDB at {MONGO_URI}")
         client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=MONGO_TIMEOUT)
         # Test connection
         client.server_info()
+        logging.info("Successfully connected to MongoDB")
         db = client["news_scraper"]
         yield db
     except ServerSelectionTimeoutError:
-        logging.error("Database connection timeout")
+        logging.error(f"Database connection timeout after {MONGO_TIMEOUT}ms")
         raise
     except Exception as e:
         logging.error(f"Database error: {str(e)}")
@@ -29,16 +32,61 @@ def get_db():
     finally:
         if client:
             client.close()
+            logging.info("MongoDB connection closed")
 
-def save_article(article):
+def check_existing_articles():
     with get_db() as db:
         try:
-            if not db.articles.find_one({"url": article["url"]}):
-                db.articles.insert_one(article)
+            articles = list(db.articles.find({}, {"url": 1, "title": 1, "published_at": 1, "source": 1}))
+            logging.info(f"Found {len(articles)} articles in database")
+            for article in articles:
+                logging.info(f"Article: {article.get('title', 'no title')} "
+                           f"from {article.get('source', 'no source')} "
+                           f"published at {article.get('published_at', 'no date')} "
+                           f"URL: {article.get('url', 'no url')}")
+            return articles
+        except Exception as e:
+            logging.error(f"Error checking existing articles: {str(e)}")
+            return []
+
+def save_article(article):
+    logging.info(f"Attempting to save article: {article.get('url', 'unknown URL')}")
+    with get_db() as db:
+        try:
+            # Log article details
+            logging.info(f"Article details: title='{article.get('title', 'no title')}', "
+                        f"source='{article.get('source', 'no source')}', "
+                        f"published_at='{article.get('published_at', 'no date')}', "
+                        f"content_length={len(article.get('content', ''))}")
+            
+            # Check if article exists
+            existing = db.articles.find_one({"url": article["url"]})
+            if existing:
+                logging.info(f"Article already exists in database: {article['url']}")
+                logging.info(f"Existing article details: title='{existing.get('title', 'no title')}', "
+                           f"published_at='{existing.get('published_at', 'no date')}', "
+                           f"source='{existing.get('source', 'no source')}'")
+                return False
+                
+            # Insert article
+            logging.info("No existing article found, attempting to insert...")
+            result = db.articles.insert_one(article)
+            if result.inserted_id:
+                logging.info(f"Successfully saved article with ID: {result.inserted_id}")
+                # Verify the article was saved
+                saved = db.articles.find_one({"_id": result.inserted_id})
+                if saved:
+                    logging.info(f"Verified article saved: {saved.get('title', 'no title')}")
+                else:
+                    logging.error("Article not found after saving!")
                 return True
-            return False
+            else:
+                logging.error("Failed to insert article - no ID returned")
+                return False
+                
         except Exception as e:
             logging.error(f"Error saving article: {str(e)}")
+            logging.error(f"Article data: {json.dumps(article, default=str)}")
             return False
 
 def get_last_scrape_time(source_name):
