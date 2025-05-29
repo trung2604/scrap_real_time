@@ -35,12 +35,12 @@ if __name__ == "__main__":
     # Create scheduler
     scheduler = BackgroundScheduler()
     
-    # Add job to run every hour
+    # Add job to run every 12 hours (at 00:00 and 12:00)
     scheduler.add_job(
         run_scrape,
-        trigger=CronTrigger(hour='*'),  # Run every hour
+        trigger=CronTrigger(hour='0,12'),  # Run at 00:00 and 12:00
         id='scrape_job',
-        name='Scrape news articles every hour'
+        name='Scrape news articles every 12 hours'
     )
     
     # Run scraping immediately
