@@ -6,25 +6,18 @@ import re
 import dateutil.parser
 import json
 from newspaper import Article
+import requests
+from bs4 import BeautifulSoup
+import time
+import certifi
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 class SkySportsScraper(BaseScraper):
     def __init__(self):
-        article_url_pattern = r"https://www\.skysports\.com/(?:football|f1|cricket|tennis|boxing|golf|rugby-union|rugby-league|nfl|racing|darts|netball|mma|news)/news/\d+/.+"
+        article_url_pattern = r"https://www\.skysports\.com/(?:football|f1)/news/\d+/[a-z0-9-]+"
         self.news_sections = [
-            '/football/news/',
-            '/f1/news/',
-            '/cricket/news/',
-            '/tennis/news/',
-            '/boxing/news/',
-            '/golf/news/',
-            '/rugby-union/news/',
-            '/rugby-league/news/',
-            '/nfl/news/',
-            '/racing/news/',
-            '/darts/news/',
-            '/netball/news/',
-            '/mma/news/',
-            # Thêm các bộ môn thể thao khác nếu có
+            '/football/news/', '/f1/news/'
         ]
         self.exclude_keywords = ["video", "podcast", "live-blog", "watch", "tv", "live", "highlights"]
         super().__init__(
@@ -32,36 +25,122 @@ class SkySportsScraper(BaseScraper):
             base_url="https://www.skysports.com",
             article_url_pattern=article_url_pattern
         )
-        self.max_links_to_crawl = 3000
+        self.max_links_to_crawl = 5000
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+        }
+        # Setup session with retry and SSL verification
+        self.session = requests.Session()
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
+        self.session.verify = certifi.where()
+
+    def _get_soup(self, url):
+        """Get BeautifulSoup object with proper SSL verification"""
+        try:
+            response = self.session.get(url, headers=self.headers, timeout=10)
+            response.raise_for_status()
+            return BeautifulSoup(response.text, 'html.parser')
+        except Exception as e:
+            logging.error(f"[SkySports] Error fetching {url}: {e}")
+            return None
 
     def _extract_links_with_pagination(self, section_url):
         links = []
         page = 1
         while len(links) < self.max_links_to_crawl:
-            # Sky Sports dùng dạng phân trang /page/{page}
-            url = section_url.rstrip('/') + f'/page/{page}' if page > 1 else section_url
+            # SkySports sử dụng ?page=2 thay vì /page/2
+            url = section_url if page == 1 else f"{section_url}?page={page}"
+            logging.info(f"[SkySports] Fetching page {page} from {url}")
             soup = self._get_soup(url)
             if not soup:
+                logging.warning(f"[SkySports] Could not fetch page {page} from {url}")
                 break
             new_links = []
-            for a in soup.find_all('a', href=True):
-                href = a['href']
-                if href.startswith('/'):
-                    href = urljoin(self.base_url, href)
-                elif not href.startswith('http'):
-                    href = urljoin(section_url, href)
-                if re.match(self.article_url_pattern, href):
-                    if any(x in href.lower() for x in self.exclude_keywords):
-                        continue
-                    if href not in links and href not in new_links:
-                        new_links.append(href)
+            # Look for article links in specific containers
+            article_containers = soup.find_all('div', class_=re.compile('news-list__item|news-list__headline'))
+            for container in article_containers:
+                a = container.find('a', href=True)
+                if a:
+                    href = a['href']
+                    if href.startswith('/'):
+                        href = urljoin(self.base_url, href)
+                    if re.match(self.article_url_pattern, href):
+                        if any(x in href.lower() for x in self.exclude_keywords):
+                            continue
+                        if href not in links and href not in new_links:
+                            new_links.append(href)
+                            logging.debug(f"[SkySports] Found article link: {href}")
             if not new_links:
+                logging.info(f"[SkySports] No new links found on page {page}, stopping pagination")
                 break
             links.extend(new_links)
+            if page == 1:
+                logging.info(f"[SkySports] First 5 links from {section_url}: {links[:5]}")
+            logging.info(f"[SkySports] Total links found in {section_url} after page {page}: {len(links)}")
             if len(links) >= self.max_links_to_crawl:
+                logging.info(f"[SkySports] Reached max links limit ({self.max_links_to_crawl})")
                 break
             page += 1
+            time.sleep(2)  # Add delay between pages
         return links[:self.max_links_to_crawl]
+
+    def scrape_article_content(self, url):
+        """Override scrape_article_content to handle article content"""
+        try:
+            soup = self._get_soup(url)
+            if not soup:
+                return None
+
+            # Extract title
+            title_elem = soup.find('h1', class_=re.compile('article__headline|article__title'))
+            if not title_elem:
+                title_elem = soup.find('h1')
+            title = title_elem.get_text(strip=True) if title_elem else None
+
+            # Extract content
+            content_elem = soup.find('div', class_=re.compile('article__body|article__content'))
+            if not content_elem:
+                content_elem = soup.find('article')
+            if content_elem:
+                # Remove unwanted elements
+                for unwanted in content_elem.find_all(['script', 'style', 'iframe', 'div.article-share', 'div.article-tags', 'div.article-related']):
+                    unwanted.decompose()
+                content = ' '.join([p.get_text(strip=True) for p in content_elem.find_all(['p', 'h2', 'h3', 'h4'])])
+            else:
+                content = None
+
+            # Extract date
+            date_elem = soup.find('time') or soup.find('span', class_=re.compile('article__timestamp|article__date'))
+            published_at = None
+            if date_elem and date_elem.get('datetime'):
+                try:
+                    published_at = dateutil.parser.parse(date_elem['datetime'])
+                except:
+                    pass
+
+            if title and content:
+                return {
+                    'title': title,
+                    'content': content,
+                    'published_at': published_at,
+                    'url': url,
+                    'source': self.source_name
+                }
+            return None
+        except Exception as e:
+            logging.error(f"[SkySports] Error scraping article {url}: {e}")
+            return None
 
     def scrape_all_articles(self):
         articles = []
@@ -70,34 +149,30 @@ class SkySportsScraper(BaseScraper):
         try:
             for section in self.news_sections:
                 section_url = urljoin(self.base_url, section)
-                logging.info(f"[SkySports] Scraping section: {section_url}")
+                logging.info(f"[SkySports] Starting to scrape section: {section_url}")
                 links = self._extract_links_with_pagination(section_url)
                 logging.info(f"[SkySports] Found {len(links)} links in section {section}")
+                if len(links) == 0:
+                    logging.warning(f"[SkySports] No article links found in section {section_url}")
                 for link in links:
                     if any(article['url'] == link for article in articles):
                         continue
                     try:
-                        article_soup = self._get_soup(link)
-                        if not article_soup:
-                            continue
-                        date = self._extract_date(article_soup, link)
-                        if not date:
-                            logging.warning(f"[SkySports] Could not extract date for {link}")
-                            continue
-                        title = self._extract_title(article_soup)
-                        content = self._extract_content(article_soup)
-                        if title and content:
+                        article = self.scrape_article_content(link)
+                        if article:
                             articles.append({
-                                'title': title,
-                                'content': content,
+                                'title': article.get('title', ''),
+                                'content': article.get('content', ''),
                                 'url': link,
-                                'published_at': date.isoformat() + 'Z' if date else None,
+                                'published_at': article.get('published_at').isoformat() + 'Z' if article.get('published_at') else None,
                                 'source': self.source_name
                             })
-                            logging.info(f"[SkySports] Successfully scraped article: {title}")
+                            logging.info(f"[SkySports] Successfully scraped article: {article.get('title', '')}")
+                        else:
+                            logging.warning(f"[SkySports] Failed to scrape article: {link}")
                     except Exception as e:
                         logging.error(f"[SkySports] Error scraping article {link}: {e}")
-                        continue
+                    time.sleep(2)  # Add delay between articles
         except Exception as e:
             logging.error(f"[SkySports] Error in scrape_all_articles: {e}")
 
@@ -244,4 +319,4 @@ class SkySportsScraper(BaseScraper):
 
 scraper = SkySportsScraper()
 scrape_all_articles = scraper.scrape_all_articles
-scrape_article_content = scraper
+scrape_article_content = scraper.scrape_article_content

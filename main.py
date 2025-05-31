@@ -32,7 +32,7 @@ def main():
         with open(config_path) as f:
             sources = json.load(f)
 
-        # Check existing articles
+        # Check existing articlesz`
         logging.info("Checking existing articles in database...")
         existing_articles = check_existing_articles()
 

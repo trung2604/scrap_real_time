@@ -6,6 +6,12 @@ import dateutil.parser
 import json
 import re
 from urllib.parse import urljoin
+import requests
+from bs4 import BeautifulSoup
+import time
+import certifi
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 class CNBCScraper(BaseScraper):
     def __init__(self):
@@ -29,6 +35,34 @@ class CNBCScraper(BaseScraper):
             article_url_pattern=article_url_pattern
         )
         self.max_links_to_crawl = 3000
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+        }
+        # Setup session with retry and SSL verification
+        self.session = requests.Session()
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
+        self.session.verify = certifi.where()
+
+    def _get_soup(self, url):
+        """Get BeautifulSoup object with SSL verification and retry strategy"""
+        try:
+            response = self.session.get(url, headers=self.headers, timeout=10)
+            response.raise_for_status()
+            return BeautifulSoup(response.text, 'html.parser')
+        except Exception as e:
+            logging.error(f"[CNBC] Error fetching {url}: {e}")
+            return None
 
     def _extract_links(self, soup, base_url):
         links = []
@@ -58,8 +92,10 @@ class CNBCScraper(BaseScraper):
         while len(links) < self.max_links_to_crawl:
             # CNBC dùng dạng phân trang ?page={page}
             url = section_url + f'?page={page}' if page > 1 else section_url
+            logging.info(f"[CNBC] Fetching page {page} from {url}")
             soup = self._get_soup(url)
             if not soup:
+                logging.warning(f"[CNBC] Could not fetch page {page} from {url}")
                 break
             new_links = []
             for a in soup.find_all('a', href=True):
@@ -73,12 +109,19 @@ class CNBCScraper(BaseScraper):
                         continue
                     if href not in links and href not in new_links:
                         new_links.append(href)
+                        logging.debug(f"[CNBC] Found article link: {href}")
             if not new_links:
+                logging.info(f"[CNBC] No new links found on page {page}, stopping pagination")
                 break
             links.extend(new_links)
+            if page == 1:
+                logging.info(f"[CNBC] First 5 links from {section_url}: {links[:5]}")
+            logging.info(f"[CNBC] Total links found in {section_url} after page {page}: {len(links)}")
             if len(links) >= self.max_links_to_crawl:
+                logging.info(f"[CNBC] Reached max links limit ({self.max_links_to_crawl})")
                 break
             page += 1
+            time.sleep(2)  # Add delay between pages
         return links[:self.max_links_to_crawl]
 
     def scrape_all_articles(self):
@@ -90,28 +133,27 @@ class CNBCScraper(BaseScraper):
                 logging.info(f"[CNBC] Scraping section: {section_url}")
                 links = self._extract_links_with_pagination(section_url)
                 logging.info(f"[CNBC] Found {len(links)} links in section {section}")
+                if len(links) == 0:
+                    logging.warning(f"[CNBC] No article links found in section {section_url}")
                 for link in links:
                     if any(article['url'] == link for article in articles):
+                        logging.debug(f"[CNBC] Skipping duplicate article: {link}")
                         continue
                     try:
-                        article_soup = self._get_soup(link)
-                        if not article_soup:
-                            continue
-                        date = self._extract_date(article_soup)
-                        if not date:
-                            logging.warning(f"[CNBC] Could not extract date for {link}")
-                            continue
-                        title = self._extract_title(article_soup)
-                        content = self._extract_content(article_soup)
-                        if title and content:
+                        logging.info(f"[CNBC] Scraping article: {link}")
+                        article = self.scrape_article_content(link)
+                        if article:
                             articles.append({
-                                'title': title,
-                                'content': content,
+                                'title': article.get('title', ''),
+                                'content': article.get('content', ''),
                                 'url': link,
-                                'published_at': date,
+                                'published_at': article.get('published_at').isoformat() + 'Z' if article.get('published_at') else None,
                                 'source': self.source_name
                             })
-                            logging.info(f"[CNBC] Successfully scraped article: {title}")
+                            logging.info(f"[CNBC] Successfully scraped article: {article.get('title', '')}")
+                        else:
+                            logging.warning(f"[CNBC] Failed to scrape article: {link}")
+                        time.sleep(2)  # Add delay between articles
                     except Exception as e:
                         logging.error(f"[CNBC] Error scraping article {link}: {e}")
                         continue
