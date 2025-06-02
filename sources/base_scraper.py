@@ -7,6 +7,9 @@ import time
 import sys
 from pathlib import Path
 import pytz
+import re
+import requests
+from bs4 import BeautifulSoup
 
 # Add parent directory to path to allow imports
 sys.path.append(str(Path(__file__).parent.parent))
@@ -24,10 +27,40 @@ class BaseScraper:
         self.current_date = datetime.now(self.timezone)
         # Set cutoff date to 24 hours ago
         self.cutoff_date = self.current_date - timedelta(days=1)
+        # Rate limiting settings
+        self.min_delay_between_requests = 2  # Minimum seconds between requests
+        self.max_retries = 3  # Maximum number of retries for failed requests
+        self.retry_delay = 5  # Base delay between retries in seconds
+        self.last_request_time = 0  # Track last request time for rate limiting
+
+    def _rate_limit(self):
+        """Implement rate limiting between requests"""
+        current_time = time.time()
+        time_since_last_request = current_time - self.last_request_time
+        if time_since_last_request < self.min_delay_between_requests:
+            time.sleep(self.min_delay_between_requests - time_since_last_request)
+        self.last_request_time = time.time()
 
     def _get_soup(self, url):
-        """Get BeautifulSoup object for URL"""
-        return fetch_url(url)
+        """Get BeautifulSoup object for URL with rate limiting and retry logic"""
+        for attempt in range(self.max_retries):
+            try:
+                self._rate_limit()
+                response = requests.get(url, headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1',
+                }, timeout=30)
+                response.raise_for_status()
+                return BeautifulSoup(response.text, 'html.parser')
+            except Exception as e:
+                logging.error(f"[{self.source_name}] Error fetching {url} (attempt {attempt + 1}/{self.max_retries}): {str(e)}")
+                if attempt < self.max_retries - 1:
+                    time.sleep(self.retry_delay * (attempt + 1))
+                else:
+                    return None
 
     def _extract_with_newspaper(self, url):
         """Extract article using newspaper3k"""
@@ -46,7 +79,6 @@ class BaseScraper:
 
     def _extract_date_from_url(self, url):
         """Extract date from URL if possible"""
-        import re
         try:
             date_match = re.search(r'/(\d{4})/(\d{2})/(\d{2})/', url)
             if date_match:
@@ -100,7 +132,8 @@ class BaseScraper:
             published_at = self.timezone.localize(published_at)
         # Convert to UTC if it has different timezone
         published_at = published_at.astimezone(self.timezone)
-        return published_at >= self.cutoff_date
+        # Allow articles up to 48 hours old to ensure we don't miss any
+        return published_at >= (self.current_date - timedelta(days=2))
 
     def parse_date(self, date_str, date_elem):
         """Parse date from various formats and elements"""
@@ -186,9 +219,29 @@ class BaseScraper:
         if not article.get('title') or not article.get('content'):
             return False
             
-        # Check content length
-        if len(article['content'].strip()) < 100:  # Minimum 100 characters
+        # Check content length (minimum 100 characters)
+        if len(article['content'].strip()) < 100:
             return False
+            
+        # Check title length (minimum 10 characters)
+        if len(article['title'].strip()) < 10:
+            return False
+            
+        # Check for common spam patterns
+        spam_patterns = [
+            r'\b(?:click here|read more|subscribe now|sign up|register now)\b',
+            r'\b(?:free|win|winner|prize|giveaway|contest)\b',
+            r'\b(?:buy now|order now|shop now|get it now)\b',
+            r'\b(?:limited time|limited offer|special offer|discount)\b',
+            r'\b(?:guaranteed|100%|best|top|amazing|incredible)\b',
+            r'\b(?:click|link|url|website|web site|homepage)\b',
+            r'\b(?:http|www|\.com|\.net|\.org)\b'
+        ]
+        content_lower = article['content'].lower()
+        title_lower = article['title'].lower()
+        for pattern in spam_patterns:
+            if re.search(pattern, content_lower) or re.search(pattern, title_lower):
+                return False
             
         # Check date
         if not self.is_recent_article(article.get('published_at')):
@@ -197,9 +250,9 @@ class BaseScraper:
         return True
 
     def scrape_article_content(self, url):
-        """Default implementation to scrape article content"""
+        """Default implementation to scrape article content with rate limiting"""
         try:
-            time.sleep(2)  # Rate limiting
+            self._rate_limit()
             
             # Try newspaper3k first
             result = self._extract_with_newspaper(url)
@@ -218,7 +271,7 @@ class BaseScraper:
                                 published_at = self._extract_date_from_jsonld(soup)
 
                 if title and content and published_at:
-                    return {
+                    article = {
                         "title": title.strip(),
                         "url": url,
                         "source": self.source_name,
@@ -226,6 +279,11 @@ class BaseScraper:
                         "published_at": published_at,
                         "scraped_at": datetime.utcnow()
                     }
+                    # Validate article before returning
+                    if self.validate_article(article):
+                        return article
+                    logging.warning(f"[{self.source_name}] Article validation failed: {url}")
+                    return None
 
             return None
 

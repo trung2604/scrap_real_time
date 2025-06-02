@@ -20,7 +20,7 @@ from selenium.webdriver.chrome.options import Options
 
 class CNBCScraper(BaseScraper):
     def __init__(self):
-        # Configure logging
+        # Configure logging first
         self.logger = logging.getLogger('CNBC')
         self.logger.setLevel(logging.INFO)
         # Create console handler with formatting
@@ -30,8 +30,8 @@ class CNBCScraper(BaseScraper):
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
 
-        # Update article pattern to be less restrictive
-        article_url_pattern = r"https://www\.cnbc\.com/(?:\d{4}/\d{2}/\d{2}/|select/|2024/|2023/|2025/|markets/|business/|technology/|politics/|economy/|investing/|personal-finance/|health-and-science/|wealth/|sports/|life/|small-business/|fintech/|financial-advisors/|options-action/|etf-street/|earnings/|trader-talk/|cybersecurity/|ai-artificial-intelligence/|enterprise/|internet/|media/|mobile/|social-media/|cnbc-disruptors/|tech-guide/|white-house/|policy/|defense/|congress/|equity-opportunity/|europe-politics/|china-politics/|asia-politics/|world-politics/).+"
+        # Update article pattern to be more flexible
+        article_url_pattern = r"https://www\.cnbc\.com/(?:sports|markets|business|technology|politics|economy|investing|personal-finance|health-and-science|wealth|life|small-business|fintech|financial-advisors|options-action|etf-street|earnings|trader-talk|cybersecurity|ai-artificial-intelligence|enterprise|internet|media|mobile|social-media|cnbc-disruptors|tech-guide|white-house|policy|defense|congress|equity-opportunity|europe-politics|china-politics|asia-politics|world-politics)/[a-z0-9-]+(?:/[a-z0-9-]+)*/?"
         self.news_sections = [
             '/sports/',
             '/sports/football/',
@@ -40,10 +40,16 @@ class CNBCScraper(BaseScraper):
             '/sports/golf/',
             '/sports/baseball/',
             '/sports/hockey/',
-            # Thêm các chuyên mục con thể thao khác nếu có
+            '/sports/soccer/',
+            '/sports/racing/',
+            '/sports/boxing/',
+            '/sports/mma/',
+            '/sports/wrestling/',
+            '/sports/olympics/',
+            '/sports/other-sports/'
         ]
         # Reduce exclude keywords to only filter out non-article content
-        self.exclude_keywords = ["video", "slideshow", "watch", "live", "tv", "subscribe"]
+        self.exclude_keywords = ["video", "slideshow", "watch", "live", "tv", "subscribe", "gallery", "pictures", "photos"]
         super().__init__(
             source_name="CNBC",
             base_url="https://www.cnbc.com",
@@ -80,27 +86,25 @@ class CNBCScraper(BaseScraper):
         self.chrome_options.add_argument('--disable-notifications')
         self.chrome_options.add_argument('--disable-popup-blocking')
         self.chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        self.chrome_options.add_argument('--disable-images')
-        self.chrome_options.add_argument('--blink-settings=imagesEnabled=false')
-        self.chrome_options.add_argument('--disk-cache-size=1')
-        self.chrome_options.add_argument('--media-cache-size=1')
-        self.chrome_options.add_argument('--disable-application-cache')
-        self.chrome_options.add_argument('--disable-cache')
-        self.chrome_options.add_argument('--disable-offline-load-stale-cache')
-        self.chrome_options.add_argument('--disable-background-networking')
-        self.chrome_options.add_argument('--disable-default-apps')
-        self.chrome_options.add_argument('--disable-sync')
-        self.chrome_options.add_argument('--disable-translate')
-        self.chrome_options.add_argument('--metrics-recording-only')
-        self.chrome_options.add_argument('--no-first-run')
-        self.chrome_options.add_argument('--safebrowsing-disable-auto-update')
-        self.chrome_options.add_argument('--password-store=basic')
+        self.chrome_options.add_argument('--disable-images')  # Disable images to speed up loading
+        self.chrome_options.add_argument('--blink-settings=imagesEnabled=false')  # Disable images in Blink
+        self.chrome_options.add_argument('--disk-cache-size=1')  # Minimize disk cache
+        self.chrome_options.add_argument('--media-cache-size=1')  # Minimize media cache
+        self.chrome_options.add_argument('--disable-application-cache')  # Disable application cache
+        self.chrome_options.add_argument('--disable-cache')  # Disable browser cache
+        self.chrome_options.add_argument('--disable-offline-load-stale-cache')  # Disable offline cache
+        self.chrome_options.add_argument('--disable-background-networking')  # Disable background networking
+        self.chrome_options.add_argument('--disable-default-apps')  # Disable default apps
+        self.chrome_options.add_argument('--disable-sync')  # Disable sync
+        self.chrome_options.add_argument('--disable-translate')  # Disable translate
+        self.chrome_options.add_argument('--metrics-recording-only')  # Disable metrics recording
+        self.chrome_options.add_argument('--no-first-run')  # Disable first run
+        self.chrome_options.add_argument('--safebrowsing-disable-auto-update')  # Disable safebrowsing
+        self.chrome_options.add_argument('--password-store=basic')  # Disable password store
         self.chrome_options.add_argument('--use-mock-keychain')
         self.chrome_options.add_argument(f'user-agent={self.headers["User-Agent"]}')
         self.chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
         self.chrome_options.add_experimental_option('useAutomationExtension', False)
-
-        # Initialize driver and wait
         self.driver = None
         self.wait = None
         self._init_driver()
@@ -117,9 +121,9 @@ class CNBCScraper(BaseScraper):
                     except:
                         pass
                 self.driver = webdriver.Chrome(options=self.chrome_options)
-                self.driver.set_page_load_timeout(20)
-                self.driver.set_script_timeout(20)
-                self.wait = WebDriverWait(self.driver, 15)
+                self.driver.set_page_load_timeout(30)  # Increased timeout
+                self.driver.set_script_timeout(30)  # Increased timeout
+                self.wait = WebDriverWait(self.driver, 20)  # Increased wait time
                 # Test the driver with a simple page
                 self.driver.get("https://www.cnbc.com")
                 self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
@@ -128,7 +132,7 @@ class CNBCScraper(BaseScraper):
             except Exception as e:
                 self.logger.error(f"Failed to initialize WebDriver (attempt {attempt + 1}/{max_retries}): {str(e)}")
                 if attempt < max_retries - 1:
-                    time.sleep(retry_delay)
+                    time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
                 else:
                     raise Exception("Failed to initialize WebDriver after multiple attempts")
 
@@ -140,10 +144,86 @@ class CNBCScraper(BaseScraper):
             try:
                 if not self.driver:
                     self._init_driver()
-                # ... existing chrome options code ...
-                
+                self.logger.info(f"Fetching URL: {url}")
                 self.driver.get(url)
-                # ... existing selectors and wait code ...
+                # Wait for article content to load with multiple possible selectors
+                selectors = [
+                    (By.CLASS_NAME, "Card-title"),
+                    (By.CLASS_NAME, "Card-description"),
+                    (By.CLASS_NAME, "Card-media"),
+                    (By.CLASS_NAME, "Card-image"),
+                    (By.CLASS_NAME, "Card-content"),
+                    (By.CLASS_NAME, "Card-body"),
+                    (By.CLASS_NAME, "Card-footer"),
+                    (By.CLASS_NAME, "Card-header"),
+                    (By.CLASS_NAME, "Card-wrapper"),
+                    (By.CLASS_NAME, "Card-container"),
+                    (By.CLASS_NAME, "Card-grid"),
+                    (By.CLASS_NAME, "Card-row"),
+                    (By.CLASS_NAME, "Card-col"),
+                    (By.CLASS_NAME, "Card-box"),
+                    (By.CLASS_NAME, "Card-card"),
+                    (By.CLASS_NAME, "Card-panel"),
+                    (By.CLASS_NAME, "Card-section"),
+                    (By.CLASS_NAME, "Card-group"),
+                    (By.CLASS_NAME, "Card-block"),
+                    (By.CLASS_NAME, "Card-element"),
+                    (By.CLASS_NAME, "Card-component"),
+                    (By.CLASS_NAME, "Card-widget"),
+                    (By.CLASS_NAME, "Card-module"),
+                    (By.CLASS_NAME, "Card-unit"),
+                    (By.CLASS_NAME, "Card-cell"),
+                    (By.CLASS_NAME, "River-title"),
+                    (By.CLASS_NAME, "River-description"),
+                    (By.CLASS_NAME, "River-media"),
+                    (By.CLASS_NAME, "River-image"),
+                    (By.CLASS_NAME, "River-content"),
+                    (By.CLASS_NAME, "River-body"),
+                    (By.CLASS_NAME, "River-footer"),
+                    (By.CLASS_NAME, "River-header"),
+                    (By.CLASS_NAME, "River-wrapper"),
+                    (By.CLASS_NAME, "River-container"),
+                    (By.CLASS_NAME, "River-grid"),
+                    (By.CLASS_NAME, "River-row"),
+                    (By.CLASS_NAME, "River-col"),
+                    (By.CLASS_NAME, "River-box"),
+                    (By.CLASS_NAME, "River-card"),
+                    (By.CLASS_NAME, "River-panel"),
+                    (By.CLASS_NAME, "River-section"),
+                    (By.CLASS_NAME, "River-group"),
+                    (By.CLASS_NAME, "River-block"),
+                    (By.CLASS_NAME, "River-element"),
+                    (By.CLASS_NAME, "River-component"),
+                    (By.CLASS_NAME, "River-widget"),
+                    (By.CLASS_NAME, "River-module"),
+                    (By.CLASS_NAME, "River-unit"),
+                    (By.CLASS_NAME, "River-cell"),
+                    (By.TAG_NAME, "article"),
+                    (By.TAG_NAME, "body")
+                ]
+                found_selector = False
+                for selector in selectors:
+                    try:
+                        self.wait.until(EC.presence_of_element_located(selector))
+                        self.logger.debug(f"Found element with selector: {selector}")
+                        found_selector = True
+                        break
+                    except:
+                        continue
+                if not found_selector:
+                    self.logger.warning(f"No elements found with any selector for {url}")
+                    # Log page source for debugging
+                    self.logger.debug(f"Page source: {self.driver.page_source[:1000]}...")
+                    return None
+
+                # Additional wait for dynamic content and JavaScript execution
+                time.sleep(5)
+                if not '/news/' in url or url.endswith('/news/'):
+                    # Execute JavaScript to scroll and trigger lazy loading only for list pages
+                    self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                    time.sleep(2)
+                    self.driver.execute_script("window.scrollTo(0, 0);")
+                    time.sleep(2)
                 return BeautifulSoup(self.driver.page_source, 'html.parser')
             except Exception as e:
                 self.logger.error(f"Failed to fetch {url} (attempt {attempt + 1}/{max_retries}): {str(e)}")
@@ -152,7 +232,7 @@ class CNBCScraper(BaseScraper):
                         self._init_driver()
                     except:
                         pass
-                    time.sleep(retry_delay * (attempt + 1))
+                    time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
                 else:
                     return None
 
@@ -167,10 +247,19 @@ class CNBCScraper(BaseScraper):
                 self.logger.warning(f"Could not fetch page {page}")
                 break
             new_links = []
-            article_containers = soup.find_all(['div', 'article'], class_=re.compile('article-list-item|article-card|news-card|story-card|content-list-item|article-list|content-list'))
+            # Updated selectors for article containers
+            article_containers = soup.find_all(['div', 'article'], class_=re.compile('Card-title|Card-description|Card-media|Card-image|Card-content|Card-body|Card-footer|Card-header|Card-wrapper|Card-container|Card-grid|Card-row|Card-col|Card-box|Card-card|Card-panel|Card-section|Card-group|Card-block|Card-element|Card-component|Card-widget|Card-module|Card-unit|Card-cell|Card-item-wrapper|Card-item-container|Card-item-grid|Card-item-row|Card-item-col|Card-item-box|Card-item-card|Card-item-panel|Card-item-section|Card-item-group|Card-item-block|Card-item-element|Card-item-component|Card-item-widget|Card-item-module|Card-item-unit|Card-item-cell|River-title|River-description|River-media|River-image|River-content|River-body|River-footer|River-header|River-wrapper|River-container|River-grid|River-row|River-col|River-box|River-card|River-panel|River-section|River-group|River-block|River-element|River-component|River-widget|River-module|River-unit|River-cell|River-item-wrapper|River-item-container|River-item-grid|River-item-row|River-item-col|River-item-box|River-item-card|River-item-panel|River-item-section|River-item-group|River-item-block|River-item-element|River-item-component|River-item-widget|River-item-module|River-item-unit|River-item-cell'))
+            
+            if not article_containers:
+                self.logger.warning(f"No article containers found on page {page}")
+                # Log page source for debugging
+                self.logger.debug(f"Page source: {soup.prettify()[:1000]}...")
+                break
+
             for container in article_containers:
                 a = container.find('a', href=True)
                 if not a:
+                    # Try finding link in parent elements
                     parent = container.find_parent('a', href=True)
                     if parent:
                         a = parent
@@ -178,19 +267,32 @@ class CNBCScraper(BaseScraper):
                     href = a['href']
                     if href.startswith('/'):
                         href = urljoin(self.base_url, href)
+                    # Log the href for debugging
+                    self.logger.debug(f"Found potential link: {href}")
                     if re.match(self.article_url_pattern, href):
+                        if any(x in href.lower() for x in self.exclude_keywords):
+                            self.logger.debug(f"Excluded link due to keywords: {href}")
+                            continue
                         if href not in links and href not in new_links:
                             new_links.append(href)
+                            self.logger.debug(f"Found article link: {href}")
+
             if not new_links:
                 self.logger.info(f"No new links found on page {page}, stopping pagination")
                 break
+
             links.extend(new_links)
-            self.logger.info(f"Found {len(new_links)} new links on page {page}, total: {len(links)}")
+            if page == 1:
+                self.logger.info(f"First 5 links from {section_url}: {links[:5]}")
+            self.logger.info(f"Total links found in {section_url} after page {page}: {len(links)}")
+            
             if len(links) >= self.max_links_to_crawl:
                 self.logger.info(f"Reached max links limit ({self.max_links_to_crawl})")
                 break
+                
             page += 1
-            time.sleep(3)
+            time.sleep(3)  # Increased delay between pages
+
         return links[:self.max_links_to_crawl]
 
     def scrape_article_content(self, url):
@@ -201,24 +303,25 @@ class CNBCScraper(BaseScraper):
                 return None
 
             # Extract title
-            title_elem = soup.find('h1', class_=re.compile('article-title|headline|title'))
+            title_elem = soup.find('h1', class_=re.compile('article-title|headline|title|ArticleHeader-headline'))
             if not title_elem:
                 title_elem = soup.find('h1')
             title = title_elem.get_text(strip=True) if title_elem else None
 
             # Extract content
-            content_elem = soup.find('div', class_=re.compile('article-body|article-content|story-body'))
+            content_elem = soup.find('div', class_=re.compile('article-body|article-content|story-body|ArticleBody-articleBody|ArticleBody-body'))
             if not content_elem:
                 content_elem = soup.find('article')
             if content_elem:
-                for unwanted in content_elem.find_all(['script', 'style', 'iframe', 'div.article-share', 'div.article-tags', 'div.article-related', 'div.social-share']):
+                # Remove unwanted elements
+                for unwanted in content_elem.find_all(['script', 'style', 'iframe', 'div.article-share', 'div.article-tags', 'div.article-related', 'div.social-share', 'div.ArticleBody-related', 'div.ArticleBody-tags', 'div.ArticleBody-share']):
                     unwanted.decompose()
                 content = ' '.join([p.get_text(strip=True) for p in content_elem.find_all(['p', 'h2', 'h3', 'h4'])])
             else:
                 content = None
 
             # Extract date
-            date_elem = soup.find('time') or soup.find('span', class_=re.compile('date|timestamp|published'))
+            date_elem = soup.find('time') or soup.find('span', class_=re.compile('date|timestamp|published|ArticleHeader-date'))
             published_at = None
             if date_elem and date_elem.get('datetime'):
                 try:
