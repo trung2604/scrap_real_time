@@ -17,11 +17,21 @@ import dateutil.parser
 
 class NBAScraper(BaseScraper):
     def __init__(self):
+        # Configure logging
+        self.logger = logging.getLogger('NBA')
+        self.logger.setLevel(logging.INFO)
+        # Create console handler with formatting
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        ch.setFormatter(formatter)
+        self.logger.addHandler(ch)
+
         # NBA.com có dạng link bài báo:
         # - https://www.nba.com/news/title-article
         # - https://www.nba.com/team/news/title-article
         # - https://www.nba.com/player/news/title-article
-        article_url_pattern = r"https://www\.nba\.com/(?:news|team|player)/[a-z0-9-]+"
+        article_url_pattern = r"https://www\.nba\.com/(?:news|team|player)/[a-z0-9-]+(?:/[a-z0-9-]+)*/?"
         self.news_sections = [
             '/news/', '/team/news/', '/player/news/'
         ]
@@ -45,7 +55,7 @@ class NBAScraper(BaseScraper):
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
         self.session.verify = certifi.where()
-        # Setup Chrome options for Selenium with additional settings
+        # Setup Chrome options for Selenium
         self.chrome_options = Options()
         self.chrome_options.add_argument('--headless')
         self.chrome_options.add_argument('--no-sandbox')
@@ -56,23 +66,22 @@ class NBAScraper(BaseScraper):
         self.chrome_options.add_argument('--disable-notifications')
         self.chrome_options.add_argument('--disable-popup-blocking')
         self.chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        self.chrome_options.add_argument('--disable-images')  # Disable images to speed up loading
-        self.chrome_options.add_argument('--disable-javascript')  # Disable JavaScript for article pages
-        self.chrome_options.add_argument('--blink-settings=imagesEnabled=false')  # Disable images in Blink
-        self.chrome_options.add_argument('--disk-cache-size=1')  # Minimize disk cache
-        self.chrome_options.add_argument('--media-cache-size=1')  # Minimize media cache
-        self.chrome_options.add_argument('--disable-application-cache')  # Disable application cache
-        self.chrome_options.add_argument('--disable-cache')  # Disable browser cache
-        self.chrome_options.add_argument('--disable-offline-load-stale-cache')  # Disable offline cache
-        self.chrome_options.add_argument('--disable-background-networking')  # Disable background networking
-        self.chrome_options.add_argument('--disable-default-apps')  # Disable default apps
-        self.chrome_options.add_argument('--disable-sync')  # Disable sync
-        self.chrome_options.add_argument('--disable-translate')  # Disable translate
-        self.chrome_options.add_argument('--metrics-recording-only')  # Disable metrics recording
-        self.chrome_options.add_argument('--no-first-run')  # Disable first run
-        self.chrome_options.add_argument('--safebrowsing-disable-auto-update')  # Disable safebrowsing
-        self.chrome_options.add_argument('--password-store=basic')  # Disable password store
-        self.chrome_options.add_argument('--use-mock-keychain')  # Use mock keychain
+        self.chrome_options.add_argument('--disable-images')
+        self.chrome_options.add_argument('--blink-settings=imagesEnabled=false')
+        self.chrome_options.add_argument('--disk-cache-size=1')
+        self.chrome_options.add_argument('--media-cache-size=1')
+        self.chrome_options.add_argument('--disable-application-cache')
+        self.chrome_options.add_argument('--disable-cache')
+        self.chrome_options.add_argument('--disable-offline-load-stale-cache')
+        self.chrome_options.add_argument('--disable-background-networking')
+        self.chrome_options.add_argument('--disable-default-apps')
+        self.chrome_options.add_argument('--disable-sync')
+        self.chrome_options.add_argument('--disable-translate')
+        self.chrome_options.add_argument('--metrics-recording-only')
+        self.chrome_options.add_argument('--no-first-run')
+        self.chrome_options.add_argument('--safebrowsing-disable-auto-update')
+        self.chrome_options.add_argument('--password-store=basic')
+        self.chrome_options.add_argument('--use-mock-keychain')
         self.chrome_options.add_argument(f'user-agent={self.headers["User-Agent"]}')
         self.chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
         self.chrome_options.add_experimental_option('useAutomationExtension', False)
@@ -92,16 +101,16 @@ class NBAScraper(BaseScraper):
                     except:
                         pass
                 self.driver = webdriver.Chrome(options=self.chrome_options)
-                self.driver.set_page_load_timeout(20)  # Reduced timeout
-                self.driver.set_script_timeout(20)  # Reduced timeout
-                self.wait = WebDriverWait(self.driver, 15)  # Reduced wait time
+                self.driver.set_page_load_timeout(20)
+                self.driver.set_script_timeout(20)
+                self.wait = WebDriverWait(self.driver, 15)
                 # Test the driver with a simple page
                 self.driver.get("https://www.nba.com")
                 self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-                logging.info("[NBA.com] Successfully initialized Selenium WebDriver")
+                self.logger.info("Successfully initialized WebDriver")
                 return
             except Exception as e:
-                logging.error(f"[NBA.com] Failed to initialize WebDriver (attempt {attempt + 1}/{max_retries}): {e}")
+                self.logger.error(f"Failed to initialize WebDriver (attempt {attempt + 1}/{max_retries}): {str(e)}")
                 if attempt < max_retries - 1:
                     time.sleep(retry_delay)
                 else:
@@ -115,12 +124,54 @@ class NBAScraper(BaseScraper):
             try:
                 if not self.driver:
                     self._init_driver()
-                # Enable JavaScript for list pages, disable for article pages
-                is_article = '/news/' in url and not url.endswith('/news/')
-                if is_article:
-                    self.chrome_options.add_argument('--disable-javascript')
-                else:
-                    self.chrome_options.remove_argument('--disable-javascript')
+                # Create new options for each request to enable JavaScript
+                chrome_options = Options()
+                chrome_options.add_argument('--headless')
+                chrome_options.add_argument('--no-sandbox')
+                chrome_options.add_argument('--disable-dev-shm-usage')
+                chrome_options.add_argument('--disable-gpu')
+                chrome_options.add_argument('--disable-extensions')
+                chrome_options.add_argument('--disable-infobars')
+                chrome_options.add_argument('--disable-notifications')
+                chrome_options.add_argument('--disable-popup-blocking')
+                chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+                chrome_options.add_argument('--disable-images')
+                chrome_options.add_argument('--blink-settings=imagesEnabled=false')
+                chrome_options.add_argument('--disk-cache-size=1')
+                chrome_options.add_argument('--media-cache-size=1')
+                chrome_options.add_argument('--disable-application-cache')
+                chrome_options.add_argument('--disable-cache')
+                chrome_options.add_argument('--disable-offline-load-stale-cache')
+                chrome_options.add_argument('--disable-background-networking')
+                chrome_options.add_argument('--disable-default-apps')
+                chrome_options.add_argument('--disable-sync')
+                chrome_options.add_argument('--disable-translate')
+                chrome_options.add_argument('--metrics-recording-only')
+                chrome_options.add_argument('--no-first-run')
+                chrome_options.add_argument('--safebrowsing-disable-auto-update')
+                chrome_options.add_argument('--password-store=basic')
+                chrome_options.add_argument('--use-mock-keychain')
+                chrome_options.add_argument(f'user-agent={self.headers["User-Agent"]}')
+                chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
+                chrome_options.add_experimental_option('useAutomationExtension', False)
+                
+                # Reinitialize driver with new options
+                if self.driver:
+                    try:
+                        self.driver.quit()
+                    except:
+                        pass
+                self.driver = webdriver.Chrome(options=chrome_options)
+                self.driver.set_page_load_timeout(30)
+                self.driver.set_script_timeout(30)
+                self.wait = WebDriverWait(self.driver, 25)
+                
+                # Add proxy support if configured
+                if hasattr(self, 'proxy') and self.proxy:
+                    self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {"userAgent": self.headers["User-Agent"]})
+                    self.driver.execute_cdp_cmd('Network.enable', {})
+                    self.driver.execute_cdp_cmd('Network.setExtraHTTPHeaders', {"headers": self.headers})
+                
                 self.driver.get(url)
                 # Wait for article content to load with multiple possible selectors
                 selectors = [
@@ -135,7 +186,7 @@ class NBAScraper(BaseScraper):
                     (By.CLASS_NAME, "article-body"),
                     (By.CLASS_NAME, "article-content"),
                     (By.CLASS_NAME, "story-body"),
-                    (By.TAG_NAME, "body")  # Fallback to body tag
+                    (By.TAG_NAME, "body")
                 ]
                 for selector in selectors:
                     try:
@@ -143,23 +194,21 @@ class NBAScraper(BaseScraper):
                         break
                     except:
                         continue
-                # Additional wait for dynamic content and JavaScript execution
-                time.sleep(3)  # Reduced wait time
-                if not is_article:
-                    # Execute JavaScript to scroll and trigger lazy loading only for list pages
+                time.sleep(5)
+                if not '/news/' in url or url.endswith('/news/'):
                     self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    time.sleep(1)
+                    time.sleep(2)
                     self.driver.execute_script("window.scrollTo(0, 0);")
-                    time.sleep(1)
+                    time.sleep(2)
                 return BeautifulSoup(self.driver.page_source, 'html.parser')
             except Exception as e:
-                logging.error(f"[NBA.com] Error fetching {url} (attempt {attempt + 1}/{max_retries}): {e}")
+                self.logger.error(f"Failed to fetch {url} (attempt {attempt + 1}/{max_retries}): {str(e)}")
                 if attempt < max_retries - 1:
                     try:
-                        self._init_driver()  # Try to reinitialize driver
+                        self._init_driver()
                     except:
                         pass
-                    time.sleep(retry_delay)
+                    time.sleep(retry_delay * (attempt + 1))
                 else:
                     return None
 
@@ -168,19 +217,16 @@ class NBAScraper(BaseScraper):
         page = 1
         while len(links) < self.max_links_to_crawl:
             url = section_url if page == 1 else f"{section_url}?page={page}"
-            logging.info(f"[NBA.com] Fetching page {page} from {url}")
+            self.logger.info(f"Fetching page {page}")
             soup = self._get_soup(url)
             if not soup:
-                logging.warning(f"[NBA.com] Could not fetch page {page} from {url}")
+                self.logger.warning(f"Could not fetch page {page}")
                 break
             new_links = []
-            # Look for article links in multiple possible containers
             article_containers = soup.find_all(['div', 'article'], class_=re.compile('article-list-item|article-card|news-card|story-card|content-list-item|article-list|content-list'))
             for container in article_containers:
-                # Try multiple ways to find the link
                 a = container.find('a', href=True)
                 if not a:
-                    # Try finding link in parent elements
                     parent = container.find_parent('a', href=True)
                     if parent:
                         a = parent
@@ -188,26 +234,19 @@ class NBAScraper(BaseScraper):
                     href = a['href']
                     if href.startswith('/'):
                         href = urljoin(self.base_url, href)
-                    # Log the href for debugging
-                    logging.debug(f"[NBA.com] Found potential link: {href}")
                     if re.match(self.article_url_pattern, href):
                         if href not in links and href not in new_links:
                             new_links.append(href)
-                            logging.debug(f"[NBA.com] Found article link: {href}")
             if not new_links:
-                logging.info(f"[NBA.com] No new links found on page {page}, stopping pagination")
-                # Log the page source for debugging if no links found
-                logging.debug(f"[NBA.com] Page source for {url}: {soup.prettify()[:1000]}...")  # Log first 1000 chars
+                self.logger.info(f"No new links found on page {page}, stopping pagination")
                 break
             links.extend(new_links)
-            if page == 1:
-                logging.info(f"[NBA.com] First 5 links from {section_url}: {links[:5]}")
-            logging.info(f"[NBA.com] Total links found in {section_url} after page {page}: {len(links)}")
+            self.logger.info(f"Found {len(new_links)} new links on page {page}, total: {len(links)}")
             if len(links) >= self.max_links_to_crawl:
-                logging.info(f"[NBA.com] Reached max links limit ({self.max_links_to_crawl})")
+                self.logger.info(f"Reached max links limit ({self.max_links_to_crawl})")
                 break
             page += 1
-            time.sleep(3)  # Increased delay between pages
+            time.sleep(3)
         return links[:self.max_links_to_crawl]
 
     def scrape_article_content(self, url):
@@ -228,7 +267,6 @@ class NBAScraper(BaseScraper):
             if not content_elem:
                 content_elem = soup.find('article')
             if content_elem:
-                # Remove unwanted elements
                 for unwanted in content_elem.find_all(['script', 'style', 'iframe', 'div.article-share', 'div.article-tags', 'div.article-related', 'div.social-share']):
                     unwanted.decompose()
                 content = ' '.join([p.get_text(strip=True) for p in content_elem.find_all(['p', 'h2', 'h3', 'h4'])])
@@ -245,6 +283,7 @@ class NBAScraper(BaseScraper):
                     pass
 
             if title and content:
+                self.logger.info(f"Successfully scraped article: {title[:50]}...")
                 return {
                     'title': title,
                     'content': content,
@@ -252,9 +291,10 @@ class NBAScraper(BaseScraper):
                     'url': url,
                     'source': self.source_name
                 }
+            self.logger.warning(f"Failed to extract content from article: {url}")
             return None
         except Exception as e:
-            logging.error(f"[NBA.com] Error scraping article {url}: {e}")
+            self.logger.error(f"Error scraping article {url}: {str(e)}")
             return None
 
     def scrape_all_articles(self):
@@ -262,18 +302,16 @@ class NBAScraper(BaseScraper):
         try:
             for section in self.news_sections:
                 section_url = urljoin(self.base_url, section)
-                logging.info(f"[NBA.com] Starting to scrape section: {section_url}")
+                self.logger.info(f"Starting to scrape section: {section}")
                 links = self._extract_links_with_pagination(section_url)
-                logging.info(f"[NBA.com] Found {len(links)} links in section {section}")
                 if len(links) == 0:
-                    logging.warning(f"[NBA.com] No article links found in section {section_url}")
-                    continue  # Skip to next section if no links found
+                    self.logger.warning(f"No article links found in section {section}")
+                    continue
+                self.logger.info(f"Found {len(links)} articles in section {section}")
                 for link in links:
                     if any(article['url'] == link for article in articles):
-                        logging.debug(f"[NBA.com] Skipping duplicate article: {link}")
                         continue
                     try:
-                        logging.info(f"[NBA.com] Scraping article: {link}")
                         article = self.scrape_article_content(link)
                         if article:
                             articles.append({
@@ -283,21 +321,19 @@ class NBAScraper(BaseScraper):
                                 'published_at': article.get('published_at').isoformat() + 'Z' if article.get('published_at') else None,
                                 'source': self.source_name
                             })
-                            logging.info(f"[NBA.com] Successfully scraped article: {article.get('title', '')}")
-                        else:
-                            logging.warning(f"[NBA.com] Failed to scrape article: {link}")
-                        time.sleep(2)  # Add delay between articles
+                        time.sleep(2)
                     except Exception as e:
-                        logging.error(f"[NBA.com] Error scraping article {link}: {e}")
+                        self.logger.error(f"Error scraping article {link}: {str(e)}")
                         continue
         except Exception as e:
-            logging.error(f"[NBA.com] Error in scrape_all_articles: {e}")
+            self.logger.error(f"Error in scrape_all_articles: {str(e)}")
         finally:
             if self.driver:
                 try:
                     self.driver.quit()
                 except:
                     pass
+        self.logger.info(f"Finished scraping. Total articles scraped: {len(articles)}")
         return articles
 
 scraper = NBAScraper()

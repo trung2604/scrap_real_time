@@ -18,10 +18,10 @@ import dateutil.parser
 class ATPTourScraper(BaseScraper):
     def __init__(self):
         # ATP Tour có dạng link bài báo:
-        # - https://www.atptour.com/en/news/title-article-2025
-        # - https://www.atptour.com/en/media/title-article-2025
-        # - https://www.atptour.com/en/video/title-article-2025
-        article_url_pattern = r"https://www\.atptour\.com/en/(?:news|media|video)/[a-z0-9-]+-\d{4}"
+        # - https://www.atptour.com/en/news/title-article
+        # - https://www.atptour.com/en/tournaments/title-article
+        # - https://www.atptour.com/en/players/title-article
+        article_url_pattern = r"https://www\.atptour\.com/en/(?:news|tournaments|players)/[a-z0-9-]+(?:/[a-z0-9-]+)*/?"
         self.news_sections = [
             '/en/news/', '/en/media/', '/en/video/'
         ]
@@ -53,18 +53,59 @@ class ATPTourScraper(BaseScraper):
         chrome_options.add_argument(f'user-agent={self.headers["User-Agent"]}')
         self.driver = webdriver.Chrome(options=chrome_options)
         self.wait = WebDriverWait(self.driver, 10)
+        self.chrome_options = chrome_options
 
     def _get_soup(self, url):
-        """Get BeautifulSoup object using Selenium for JavaScript content with SSL verification"""
-        try:
-            self.driver.get(url)
-            # Wait for article content to load
-            self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "article")))
-            time.sleep(2)  # Additional wait for dynamic content
-            return BeautifulSoup(self.driver.page_source, 'html.parser')
-        except Exception as e:
-            logging.error(f"[ATP Tour] Error fetching {url}: {e}")
-            return None
+        """Get BeautifulSoup object using Selenium for JavaScript content with SSL verification and retry logic"""
+        max_retries = 3
+        retry_delay = 5
+        for attempt in range(max_retries):
+            try:
+                if not self.driver:
+                    self._init_driver()
+                # Always enable JavaScript for ATP Tour
+                self.chrome_options.remove_argument('--disable-javascript')
+                self.driver.get(url)
+                # Wait for article content to load with multiple possible selectors
+                selectors = [
+                    (By.CLASS_NAME, "article-list"),
+                    (By.CLASS_NAME, "article-list-item"),
+                    (By.CLASS_NAME, "article-card"),
+                    (By.CLASS_NAME, "news-card"),
+                    (By.CLASS_NAME, "story-card"),
+                    (By.CLASS_NAME, "content-list"),
+                    (By.CLASS_NAME, "content-list-item"),
+                    (By.TAG_NAME, "article"),
+                    (By.CLASS_NAME, "article-body"),
+                    (By.CLASS_NAME, "article-content"),
+                    (By.CLASS_NAME, "story-body"),
+                    (By.TAG_NAME, "body")  # Fallback to body tag
+                ]
+                for selector in selectors:
+                    try:
+                        self.wait.until(EC.presence_of_element_located(selector))
+                        break
+                    except:
+                        continue
+                # Additional wait for dynamic content and JavaScript execution
+                time.sleep(5)  # Increased wait time for JavaScript content
+                if not '/news/' in url or url.endswith('/news/'):
+                    # Execute JavaScript to scroll and trigger lazy loading only for list pages
+                    self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                    time.sleep(2)
+                    self.driver.execute_script("window.scrollTo(0, 0);")
+                    time.sleep(2)
+                return BeautifulSoup(self.driver.page_source, 'html.parser')
+            except Exception as e:
+                logging.error(f"[ATP Tour] Error fetching {url} (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    try:
+                        self._init_driver()  # Try to reinitialize driver
+                    except:
+                        pass
+                    time.sleep(retry_delay)
+                else:
+                    return None
 
     def _extract_links_with_pagination(self, section_url):
         links = []

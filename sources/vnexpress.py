@@ -16,9 +16,13 @@ class VnExpressScraper(BaseScraper):
         # - https://e.vnexpress.net/news/sports/title-article-1234567.html
         # - https://e.vnexpress.net/news/football/title-article-1234567.html
         # - https://e.vnexpress.net/news/tennis/title-article-1234567.html
-        article_url_pattern = r"https://e\.vnexpress\.net/news/(?:sports|football|tennis|golf|othersports)/[a-z0-9-]+-\d+\.html"
+        # - https://e.vnexpress.net/news/othersports/title-article-1234567.html
+        # - https://e.vnexpress.net/news/world/title-article-1234567.html
+        # - https://e.vnexpress.net/news/business/title-article-1234567.html
+        article_url_pattern = r"https://e\.vnexpress\.net/news/(?:sports|football|tennis|golf|othersports|world|business|sports-world|sports-business)/[a-z0-9-]+-\d+\.html"
         self.news_sections = [
-            '/news/sports', '/news/football', '/news/tennis', '/news/golf', '/news/othersports'
+            '/news/sports', '/news/football', '/news/tennis', '/news/golf', '/news/othersports',
+            '/news/world', '/news/business', '/news/sports-world', '/news/sports-business'
         ]
         super().__init__("VnExpress International", "https://e.vnexpress.net", article_url_pattern)
         self.max_links_to_crawl = 3000

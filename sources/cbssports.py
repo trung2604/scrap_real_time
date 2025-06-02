@@ -21,7 +21,7 @@ class CBSSportsScraper(BaseScraper):
         # - https://www.cbssports.com/nba/news/title-article/
         # - https://www.cbssports.com/nfl/news/title-article/
         # - https://www.cbssports.com/mlb/news/title-article/
-        article_url_pattern = r"https://www\.cbssports\.com/(?:nba|nfl|mlb|nhl|college-basketball|college-football|soccer|golf|boxing|mma|wwe|olympics|fantasy)/news/[a-z0-9-]+/?"
+        article_url_pattern = r"https://www\.cbssports\.com/(?:nba|nfl|mlb|nhl|college-basketball|college-football|soccer|golf|boxing|mma|wwe|olympics|fantasy)/news/[a-z0-9-]+(?:/[a-z0-9-]+)*/?"
         self.news_sections = [
             '/nba/news/', '/nfl/news/', '/mlb/news/', '/nhl/news/',
             '/college-basketball/news/', '/college-football/news/', '/soccer/news/',
@@ -118,12 +118,48 @@ class CBSSportsScraper(BaseScraper):
             try:
                 if not self.driver:
                     self._init_driver()
-                # Enable JavaScript for list pages, disable for article pages
-                is_article = '/news/' in url and not url.endswith('/news/')
-                if is_article:
-                    self.chrome_options.add_argument('--disable-javascript')
-                else:
-                    self.chrome_options.remove_argument('--disable-javascript')
+                # Create new options for each request to enable JavaScript
+                chrome_options = Options()
+                chrome_options.add_argument('--headless')
+                chrome_options.add_argument('--no-sandbox')
+                chrome_options.add_argument('--disable-dev-shm-usage')
+                chrome_options.add_argument('--disable-gpu')
+                chrome_options.add_argument('--disable-extensions')
+                chrome_options.add_argument('--disable-infobars')
+                chrome_options.add_argument('--disable-notifications')
+                chrome_options.add_argument('--disable-popup-blocking')
+                chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+                chrome_options.add_argument('--disable-images')  # Disable images to speed up loading
+                chrome_options.add_argument('--blink-settings=imagesEnabled=false')  # Disable images in Blink
+                chrome_options.add_argument('--disk-cache-size=1')  # Minimize disk cache
+                chrome_options.add_argument('--media-cache-size=1')  # Minimize media cache
+                chrome_options.add_argument('--disable-application-cache')  # Disable application cache
+                chrome_options.add_argument('--disable-cache')  # Disable browser cache
+                chrome_options.add_argument('--disable-offline-load-stale-cache')  # Disable offline cache
+                chrome_options.add_argument('--disable-background-networking')  # Disable background networking
+                chrome_options.add_argument('--disable-default-apps')  # Disable default apps
+                chrome_options.add_argument('--disable-sync')  # Disable sync
+                chrome_options.add_argument('--disable-translate')  # Disable translate
+                chrome_options.add_argument('--metrics-recording-only')  # Disable metrics recording
+                chrome_options.add_argument('--no-first-run')  # Disable first run
+                chrome_options.add_argument('--safebrowsing-disable-auto-update')  # Disable safebrowsing
+                chrome_options.add_argument('--password-store=basic')  # Disable password store
+                chrome_options.add_argument('--use-mock-keychain')  # Use mock keychain
+                chrome_options.add_argument(f'user-agent={self.headers["User-Agent"]}')
+                chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
+                chrome_options.add_experimental_option('useAutomationExtension', False)
+                
+                # Reinitialize driver with new options
+                if self.driver:
+                    try:
+                        self.driver.quit()
+                    except:
+                        pass
+                self.driver = webdriver.Chrome(options=chrome_options)
+                self.driver.set_page_load_timeout(20)
+                self.driver.set_script_timeout(20)
+                self.wait = WebDriverWait(self.driver, 15)
+                
                 self.driver.get(url)
                 # Wait for article content to load with multiple possible selectors
                 selectors = [
@@ -147,13 +183,13 @@ class CBSSportsScraper(BaseScraper):
                     except:
                         continue
                 # Additional wait for dynamic content and JavaScript execution
-                time.sleep(3)  # Reduced wait time
-                if not is_article:
+                time.sleep(5)  # Increased wait time for JavaScript content
+                if not '/news/' in url or url.endswith('/news/'):
                     # Execute JavaScript to scroll and trigger lazy loading only for list pages
                     self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    time.sleep(1)
+                    time.sleep(2)
                     self.driver.execute_script("window.scrollTo(0, 0);")
-                    time.sleep(1)
+                    time.sleep(2)
                 return BeautifulSoup(self.driver.page_source, 'html.parser')
             except Exception as e:
                 logging.error(f"[CBS Sports] Error fetching {url} (attempt {attempt + 1}/{max_retries}): {e}")
