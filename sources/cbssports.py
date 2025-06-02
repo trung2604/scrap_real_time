@@ -267,33 +267,33 @@ class CBSSportsScraper(BaseScraper):
             if not content_elem:
                 content_elem = soup.find('article')
             if content_elem:
-                # Remove unwanted elements
-                for unwanted in content_elem.find_all(['script', 'style', 'iframe', 'div.article-share', 'div.article-tags']):
+                for unwanted in content_elem.find_all(['script', 'style', 'iframe', 'div.article-share', 'div.article-tags', 'div.article-related', 'div.social-share']):
                     unwanted.decompose()
                 content = ' '.join([p.get_text(strip=True) for p in content_elem.find_all(['p', 'h2', 'h3', 'h4'])])
             else:
                 content = None
 
-            # Extract date
-            date_elem = soup.find('time') or soup.find('span', class_=re.compile('date|timestamp|published'))
-            published_at = None
-            if date_elem and date_elem.get('datetime'):
-                try:
-                    published_at = dateutil.parser.parse(date_elem['datetime'])
-                except:
-                    pass
+            # Extract date using base class method
+            published_at = self.extract_date(soup)
 
-            if title and content:
-                return {
-                    'title': title,
-                    'content': content,
-                    'published_at': published_at,
-                    'url': url,
-                    'source': self.source_name
-                }
-            return None
+            article = {
+                'title': title,
+                'content': content,
+                'published_at': published_at,
+                'url': url,
+                'source': self.source_name
+            }
+
+            # Validate article
+            if not self.validate_article(article):
+                self.logger.warning(f"Article validation failed: {url}")
+                return None
+
+            self.logger.info(f"Successfully scraped article: {title[:50]}...")
+            return article
+
         except Exception as e:
-            logging.error(f"[CBS Sports] Error scraping article {url}: {e}")
+            self.logger.error(f"Error scraping article {url}: {str(e)}")
             return None
 
     def scrape_all_articles(self):
@@ -301,20 +301,18 @@ class CBSSportsScraper(BaseScraper):
         try:
             for section in self.news_sections:
                 section_url = urljoin(self.base_url, section)
-                logging.info(f"[CBS Sports] Starting to scrape section: {section_url}")
+                self.logger.info(f"Starting to scrape section: {section}")
                 links = self._extract_links_with_pagination(section_url)
-                logging.info(f"[CBS Sports] Found {len(links)} links in section {section}")
                 if len(links) == 0:
-                    logging.warning(f"[CBS Sports] No article links found in section {section_url}")
-                    continue  # Skip to next section if no links found
+                    self.logger.warning(f"No article links found in section {section}")
+                    continue
+                self.logger.info(f"Found {len(links)} articles in section {section}")
                 for link in links:
                     if any(article['url'] == link for article in articles):
-                        logging.debug(f"[CBS Sports] Skipping duplicate article: {link}")
                         continue
                     try:
-                        logging.info(f"[CBS Sports] Scraping article: {link}")
                         article = self.scrape_article_content(link)
-                        if article:
+                        if article and self.validate_article(article):
                             articles.append({
                                 'title': article.get('title', ''),
                                 'content': article.get('content', ''),
@@ -322,21 +320,20 @@ class CBSSportsScraper(BaseScraper):
                                 'published_at': article.get('published_at').isoformat() + 'Z' if article.get('published_at') else None,
                                 'source': self.source_name
                             })
-                            logging.info(f"[CBS Sports] Successfully scraped article: {article.get('title', '')}")
-                        else:
-                            logging.warning(f"[CBS Sports] Failed to scrape article: {link}")
-                        time.sleep(2)  # Add delay between articles
+                            self.logger.info(f"Added article: {article['title'][:50]}... (Published: {article.get('published_at')})")
+                        time.sleep(2)
                     except Exception as e:
-                        logging.error(f"[CBS Sports] Error scraping article {link}: {e}")
+                        self.logger.error(f"Error scraping article {link}: {str(e)}")
                         continue
         except Exception as e:
-            logging.error(f"[CBS Sports] Error in scrape_all_articles: {e}")
+            self.logger.error(f"Error in scrape_all_articles: {str(e)}")
         finally:
             if self.driver:
                 try:
                     self.driver.quit()
                 except:
                     pass
+        self.logger.info(f"Finished scraping. Total articles scraped: {len(articles)}")
         return articles
 
 scraper = CBSSportsScraper()

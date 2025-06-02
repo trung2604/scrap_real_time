@@ -15,11 +15,26 @@ from urllib3.util.retry import Retry
 
 class SkySportsScraper(BaseScraper):
     def __init__(self):
-        article_url_pattern = r"https://www\.skysports\.com/(?:football|f1)/news/\d+/[a-z0-9-]+"
+        # Update article pattern to be more flexible
+        article_url_pattern = r"https://www\.skysports\.com/(?:football|f1|cricket|golf|tennis|boxing|formula-1|racing|rugby-union|rugby-league|darts|snooker|cycling|wrestling|mma|ufc|boxing|golf|tennis|cricket|racing|rugby-union|rugby-league|darts|snooker|cycling|wrestling|mma|ufc)/news/[a-z0-9-]+(?:/[a-z0-9-]+)*/?"
         self.news_sections = [
-            '/football/news/', '/f1/news/'
+            '/football/news/',
+            '/f1/news/',
+            '/cricket/news/',
+            '/golf/news/',
+            '/tennis/news/',
+            '/boxing/news/',
+            '/racing/news/',
+            '/rugby-union/news/',
+            '/rugby-league/news/',
+            '/darts/news/',
+            '/snooker/news/',
+            '/cycling/news/',
+            '/wrestling/news/',
+            '/mma/news/',
+            '/ufc/news/'
         ]
-        self.exclude_keywords = ["video", "podcast", "live-blog", "watch", "tv", "live", "highlights"]
+        self.exclude_keywords = ["video", "podcast", "live-blog", "watch", "tv", "live", "highlights", "gallery", "pictures", "photos"]
         super().__init__(
             source_name="Sky Sports",
             base_url="https://www.skysports.com",
@@ -59,7 +74,6 @@ class SkySportsScraper(BaseScraper):
         links = []
         page = 1
         while len(links) < self.max_links_to_crawl:
-            # SkySports sử dụng ?page=2 thay vì /page/2
             url = section_url if page == 1 else f"{section_url}?page={page}"
             logging.info(f"[SkySports] Fetching page {page} from {url}")
             soup = self._get_soup(url)
@@ -67,14 +81,21 @@ class SkySportsScraper(BaseScraper):
                 logging.warning(f"[SkySports] Could not fetch page {page} from {url}")
                 break
             new_links = []
-            # Look for article links in specific containers
-            article_containers = soup.find_all('div', class_=re.compile('news-list__item|news-list__headline'))
+            # Updated selectors for article containers
+            article_containers = soup.find_all(['div', 'article'], class_=re.compile('news-list__item|news-list__headline|news-list__story|news-list__content|news-list__link|news-list__title|news-list__body|news-list__meta|news-list__image|news-list__wrapper|news-list__container|news-list__grid|news-list__row|news-list__col|news-list__box|news-list__card|news-list__panel|news-list__section|news-list__group|news-list__block|news-list__element|news-list__component|news-list__widget|news-list__module|news-list__unit|news-list__cell|news-list__item-wrapper|news-list__item-container|news-list__item-grid|news-list__item-row|news-list__item-col|news-list__item-box|news-list__item-card|news-list__item-panel|news-list__item-section|news-list__item-group|news-list__item-block|news-list__item-element|news-list__item-component|news-list__item-widget|news-list__item-module|news-list__item-unit|news-list__item-cell'))
             for container in article_containers:
                 a = container.find('a', href=True)
+                if not a:
+                    # Try finding link in parent elements
+                    parent = container.find_parent('a', href=True)
+                    if parent:
+                        a = parent
                 if a:
                     href = a['href']
                     if href.startswith('/'):
                         href = urljoin(self.base_url, href)
+                    # Log the href for debugging
+                    logging.debug(f"[SkySports] Found potential link: {href}")
                     if re.match(self.article_url_pattern, href):
                         if any(x in href.lower() for x in self.exclude_keywords):
                             continue
@@ -83,6 +104,8 @@ class SkySportsScraper(BaseScraper):
                             logging.debug(f"[SkySports] Found article link: {href}")
             if not new_links:
                 logging.info(f"[SkySports] No new links found on page {page}, stopping pagination")
+                # Log the page source for debugging if no links found
+                logging.debug(f"[SkySports] Page source for {url}: {soup.prettify()[:1000]}...")  # Log first 1000 chars
                 break
             links.extend(new_links)
             if page == 1:

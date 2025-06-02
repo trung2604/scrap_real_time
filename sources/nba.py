@@ -273,26 +273,25 @@ class NBAScraper(BaseScraper):
             else:
                 content = None
 
-            # Extract date
-            date_elem = soup.find('time') or soup.find('span', class_=re.compile('date|timestamp|published'))
-            published_at = None
-            if date_elem and date_elem.get('datetime'):
-                try:
-                    published_at = dateutil.parser.parse(date_elem['datetime'])
-                except:
-                    pass
+            # Extract date using base class method
+            published_at = self.extract_date(soup)
 
-            if title and content:
-                self.logger.info(f"Successfully scraped article: {title[:50]}...")
-                return {
-                    'title': title,
-                    'content': content,
-                    'published_at': published_at,
-                    'url': url,
-                    'source': self.source_name
-                }
-            self.logger.warning(f"Failed to extract content from article: {url}")
-            return None
+            article = {
+                'title': title,
+                'content': content,
+                'published_at': published_at,
+                'url': url,
+                'source': self.source_name
+            }
+
+            # Validate article
+            if not self.validate_article(article):
+                self.logger.warning(f"Article validation failed: {url}")
+                return None
+
+            self.logger.info(f"Successfully scraped article: {title[:50]}...")
+            return article
+
         except Exception as e:
             self.logger.error(f"Error scraping article {url}: {str(e)}")
             return None
@@ -313,7 +312,7 @@ class NBAScraper(BaseScraper):
                         continue
                     try:
                         article = self.scrape_article_content(link)
-                        if article:
+                        if article and self.validate_article(article):
                             articles.append({
                                 'title': article.get('title', ''),
                                 'content': article.get('content', ''),
@@ -321,6 +320,7 @@ class NBAScraper(BaseScraper):
                                 'published_at': article.get('published_at').isoformat() + 'Z' if article.get('published_at') else None,
                                 'source': self.source_name
                             })
+                            self.logger.info(f"Added article: {article['title'][:50]}... (Published: {article.get('published_at')})")
                         time.sleep(2)
                     except Exception as e:
                         self.logger.error(f"Error scraping article {link}: {str(e)}")
