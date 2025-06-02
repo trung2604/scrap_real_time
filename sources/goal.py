@@ -66,7 +66,6 @@ class GoalScraper(BaseScraper):
         self.chrome_options.add_argument('--disable-popup-blocking')
         self.chrome_options.add_argument('--disable-blink-features=AutomationControlled')
         self.chrome_options.add_argument('--disable-images')  # Disable images to speed up loading
-        self.chrome_options.add_argument('--disable-javascript')  # Disable JavaScript for article pages
         self.chrome_options.add_argument('--blink-settings=imagesEnabled=false')  # Disable images in Blink
         self.chrome_options.add_argument('--disk-cache-size=1')  # Minimize disk cache
         self.chrome_options.add_argument('--media-cache-size=1')  # Minimize media cache
@@ -165,6 +164,12 @@ class GoalScraper(BaseScraper):
                 self.driver.set_page_load_timeout(20)
                 self.driver.set_script_timeout(20)
                 self.wait = WebDriverWait(self.driver, 15)
+                
+                # Add proxy support if configured
+                if hasattr(self, 'proxy') and self.proxy:
+                    self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {"userAgent": self.headers["User-Agent"]})
+                    self.driver.execute_cdp_cmd('Network.enable', {})
+                    self.driver.execute_cdp_cmd('Network.setExtraHTTPHeaders', {"headers": self.headers})
                 
                 self.driver.get(url)
                 # Wait for article content to load with multiple possible selectors

@@ -16,6 +16,7 @@ from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
 
 class CNBCScraper(BaseScraper):
     def __init__(self):
@@ -67,6 +68,42 @@ class CNBCScraper(BaseScraper):
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
         self.session.verify = certifi.where()
+
+        # Setup Chrome options for Selenium
+        self.chrome_options = Options()
+        self.chrome_options.add_argument('--headless')
+        self.chrome_options.add_argument('--no-sandbox')
+        self.chrome_options.add_argument('--disable-dev-shm-usage')
+        self.chrome_options.add_argument('--disable-gpu')
+        self.chrome_options.add_argument('--disable-extensions')
+        self.chrome_options.add_argument('--disable-infobars')
+        self.chrome_options.add_argument('--disable-notifications')
+        self.chrome_options.add_argument('--disable-popup-blocking')
+        self.chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        self.chrome_options.add_argument('--disable-images')
+        self.chrome_options.add_argument('--blink-settings=imagesEnabled=false')
+        self.chrome_options.add_argument('--disk-cache-size=1')
+        self.chrome_options.add_argument('--media-cache-size=1')
+        self.chrome_options.add_argument('--disable-application-cache')
+        self.chrome_options.add_argument('--disable-cache')
+        self.chrome_options.add_argument('--disable-offline-load-stale-cache')
+        self.chrome_options.add_argument('--disable-background-networking')
+        self.chrome_options.add_argument('--disable-default-apps')
+        self.chrome_options.add_argument('--disable-sync')
+        self.chrome_options.add_argument('--disable-translate')
+        self.chrome_options.add_argument('--metrics-recording-only')
+        self.chrome_options.add_argument('--no-first-run')
+        self.chrome_options.add_argument('--safebrowsing-disable-auto-update')
+        self.chrome_options.add_argument('--password-store=basic')
+        self.chrome_options.add_argument('--use-mock-keychain')
+        self.chrome_options.add_argument(f'user-agent={self.headers["User-Agent"]}')
+        self.chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
+        self.chrome_options.add_experimental_option('useAutomationExtension', False)
+
+        # Initialize driver and wait
+        self.driver = None
+        self.wait = None
+        self._init_driver()
 
     def _init_driver(self):
         """Initialize Selenium WebDriver with retry logic"""

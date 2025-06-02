@@ -67,7 +67,6 @@ class TransfermarktScraper(BaseScraper):
         self.chrome_options.add_argument('--disable-popup-blocking')
         self.chrome_options.add_argument('--disable-blink-features=AutomationControlled')
         self.chrome_options.add_argument('--disable-images')  # Disable images to speed up loading
-        self.chrome_options.add_argument('--disable-javascript')  # Disable JavaScript for article pages
         self.chrome_options.add_argument('--blink-settings=imagesEnabled=false')  # Disable images in Blink
         self.chrome_options.add_argument('--disk-cache-size=1')  # Minimize disk cache
         self.chrome_options.add_argument('--media-cache-size=1')  # Minimize media cache
@@ -102,9 +101,9 @@ class TransfermarktScraper(BaseScraper):
                     except:
                         pass
                 self.driver = webdriver.Chrome(options=self.chrome_options)
-                self.driver.set_page_load_timeout(20)
-                self.driver.set_script_timeout(20)
-                self.wait = WebDriverWait(self.driver, 15)
+                self.driver.set_page_load_timeout(20)  # Standardized timeout
+                self.driver.set_script_timeout(20)  # Standardized timeout
+                self.wait = WebDriverWait(self.driver, 15)  # Standardized wait time
                 # Test the driver with a simple page
                 self.driver.get("https://www.transfermarkt.com")
                 self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
@@ -163,9 +162,9 @@ class TransfermarktScraper(BaseScraper):
                     except:
                         pass
                 self.driver = webdriver.Chrome(options=chrome_options)
-                self.driver.set_page_load_timeout(30)  # Increased timeout
-                self.driver.set_script_timeout(30)  # Increased timeout
-                self.wait = WebDriverWait(self.driver, 25)  # Increased wait time
+                self.driver.set_page_load_timeout(20)  # Standardized timeout
+                self.driver.set_script_timeout(20)  # Standardized timeout
+                self.wait = WebDriverWait(self.driver, 15)  # Standardized wait time
                 
                 # Add proxy support if configured
                 if hasattr(self, 'proxy') and self.proxy:

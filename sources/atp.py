@@ -64,9 +64,9 @@ class ATP:
                     except:
                         pass
                 self.driver = webdriver.Chrome(options=chrome_options)
-                self.driver.set_page_load_timeout(30)
-                self.driver.set_script_timeout(30)
-                self.wait = WebDriverWait(self.driver, 25)
+                self.driver.set_page_load_timeout(20)  # Standardized timeout
+                self.driver.set_script_timeout(20)  # Standardized timeout
+                self.wait = WebDriverWait(self.driver, 15)  # Standardized wait time
                 
                 # Add proxy support if configured
                 if hasattr(self, 'proxy') and self.proxy:

@@ -162,9 +162,9 @@ class NBAScraper(BaseScraper):
                     except:
                         pass
                 self.driver = webdriver.Chrome(options=chrome_options)
-                self.driver.set_page_load_timeout(30)
-                self.driver.set_script_timeout(30)
-                self.wait = WebDriverWait(self.driver, 25)
+                self.driver.set_page_load_timeout(20)
+                self.driver.set_script_timeout(20)
+                self.wait = WebDriverWait(self.driver, 15)
                 
                 # Add proxy support if configured
                 if hasattr(self, 'proxy') and self.proxy:
